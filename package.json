@@ -1,5 +1,6 @@
 {
   "name": "zen",
-  "version": "0.0.0",
-  "private": false
+  "version": "0.0.1",
+  "private": false,
+  "type": "module"
 }
