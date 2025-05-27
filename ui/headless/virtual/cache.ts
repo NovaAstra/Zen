@@ -12,8 +12,8 @@ export interface VirtualCacheChunkConfig {
 export interface VirtualCacheChunk {
   startIndex: number;
   endIndex: number;
-  sizes: Map<number, number>;
-  offsets: Map<number, number>;
+  sizes: number[];
+  offsets: number[];
   lastUsedTime: number;
 }
 
@@ -22,7 +22,7 @@ export class Cache implements VirtualCache {
 
   private readonly chunks: Map<number, VirtualCacheChunk> = new Map();
 
-  private lastComputedOffsetIndex: number = -1;
+  private lastCalculatedOffsetIndex: number = -1;
 
   public constructor(
     public readonly length: number,
@@ -30,19 +30,21 @@ export class Cache implements VirtualCache {
     config: Partial<VirtualCacheChunkConfig> = {}
   ) { }
 
-  public getItemSize(index: number): number {
+  public getItemSize(index: number) {
     if (index < 0 || index >= this.length) return 0;
     const chunk = this.getChunk(index);
-    return chunk.sizes.get(index) ?? this.defaultSize
+    return chunk.sizes[index - chunk.startIndex] ?? this.defaultSize;
   }
 
   public setItemSize(index: number, size: number) {
+    if (index < 0 || index >= this.length) return false;
+
     const chunk = this.getChunk(index);
-
-    chunk.sizes.set(index, size);
-    chunk.lastUsedTime = Date.now();
-
-    this.lastComputedOffsetIndex = Math.min(index, this.lastComputedOffsetIndex)
+    const localIndex = index - chunk.startIndex
+    const isInitialMeasurement = chunk.sizes[localIndex] === undefined;
+    chunk.sizes[localIndex] = size;
+    this.lastCalculatedOffsetIndex = Math.min(index, this.lastCalculatedOffsetIndex)
+    return isInitialMeasurement;
   }
 
   public calculateRange() { }
@@ -51,78 +53,29 @@ export class Cache implements VirtualCache {
     if (!this.length) return 0;
   }
 
-  private findIndex(offset: number, low: number = 0, high: number = this.length - 1): number {
+  private findIndex(offset: number, low: number = 0, high: number = this.length - 1) {
     if (this.length <= 0 || offset < 0) return 0;
 
-    while (low <= high) {
-      const middle = (low + high) >>> 1;
-      const itemOffset = this.calculateOffset(middle);
-
-      if (itemOffset <= offset) {
-        if (itemOffset + this.getItemSize(middle) > offset) {
-          return middle;
-        }
-        low = middle + 1;
-      } else {
-        high = middle - 1;
-      }
-    }
-    return Math.max(0, Math.min(this.length - 1, low));
   }
 
   private calculateOffset(index: number) {
     if (this.length <= 0 || index < 0) return 0;
     if (index >= this.length) index = this.length - 1;
-
-    const chunk = this.getChunk(index);
-
-    if (chunk.offsets.has(index)) {
-      return chunk.offsets.get(index)!;
-    }
-
-    let startIndex = Math.max(0, this.lastComputedOffsetIndex);
-    let offset = startIndex >= 0 ? (chunk.offsets.get(startIndex) ?? 0) : 0;
-
-    const step = index >= startIndex ? 1 : -1;
-    const end = index + step;
-
-    for (let i = startIndex; i !== end; i += step) {
-      if (step === 1 && i >= this.length) break;
-      if (step === -1 && i < 0) break;
-
-      const size = this.getItemSize(i);
-      if (step === 1) {
-        chunk.offsets.set(i, offset);
-        offset += size;
-      } else {
-        offset -= this.getItemSize(i - 1);
-        chunk.offsets.set(i - 1, offset);
-      }
-    }
-
-    this.lastComputedOffsetIndex = index;
-    chunk.lastUsedTime = Date.now();
-    return chunk.offsets.get(index) ?? offset;
   }
 
-  private getChunk(index: number): VirtualCacheChunk {
-    if (index < 0 || index >= this.length) {
-      throw new Error(`Invalid index: ${index}, must be in [0, ${this.length - 1}]`);
-    }
-
-    const chunkId = Math.floor(index / this.config.chunkSize);
-    const chunk = this.chunks.get(chunkId);
-
+  private getChunk(index: number) {
+    const chunkIndex = Math.floor(index / this.config.chunkSize);
+    let chunk = this.chunks.get(chunkIndex);
     if (!chunk) {
-      this.chunks.set(chunkId, {
-        startIndex: chunkId * this.config.chunkSize,
-        endIndex: Math.min((chunkId + 1) * this.config.chunkSize - 1, this.length - 1),
-        sizes: new Map(),
-        offsets: new Map(),
+      this.chunks.set(chunkIndex, chunk = {
+        startIndex: chunkIndex * this.config.chunkSize,
+        endIndex: (chunkIndex + 1) * this.config.chunkSize - 1,
+        sizes: new Array(this.config.chunkSize),
+        offsets: new Array(this.config.chunkSize),
         lastUsedTime: Date.now(),
       })
     }
 
-    return this.chunks.get(chunkId) as VirtualCacheChunk;
+    return chunk;
   }
 }
