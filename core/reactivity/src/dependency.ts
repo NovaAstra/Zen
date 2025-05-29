@@ -58,5 +58,4 @@ export class Dependency {
     dep.subs.delete(subIndex);
     return true;
   }
-
 }
