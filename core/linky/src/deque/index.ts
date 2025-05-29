@@ -439,18 +439,23 @@ export class Deque<T> {
    * 扁平化嵌套 Deque 或数组
    * @returns 新 Deque 实例
    */
-  public flat(): Deque<T> {
+  public flat(depth: number = 1): Deque<T> {
     const deque = new Deque<T>();
-    let node = this.head;
-    while (node) {
-      const value = node.value;
-      if (Array.isArray(value) || value instanceof Deque) {
-        deque.push(...value);
+
+    const flatten = (value: T, level: number) => {
+      if (level > 0 && (Array.isArray(value) || value instanceof Deque)) {
+        for (const item of value) {
+          flatten(item, level - 1);
+        }
       } else {
         deque.push(value);
       }
-      node = node.next;
+    };
+
+    for (const item of this) {
+      flatten(item, depth);
     }
+
     return deque;
   }
 

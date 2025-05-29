@@ -13,12 +13,13 @@ export interface Link {
 
 export enum Flags {
   None = 0,
-  Mutable = 1 << 0,
-  Watching = 1 << 1,
-  RecursedCheck = 1 << 2,
-  Recursed = 1 << 3,
-  Dirty = 1 << 4,
-  Pending = 1 << 5,
+  Mutable = 1 << 0, // 	可变实体（如 signal）
+  Watching = 1 << 1, // 正在监听（如 effect）
+  RecursedCheck = 1 << 2, // 开启递归检查依赖链
+  Recursed = 1 << 3, // 当前在递归中
+  Dirty = 1 << 4, // 脏状态（值发生了变化）
+  Pending = 1 << 5, // 可能需要更新（懒更新的中间态）
+  Queued = 1 << 6 // 副作用是否已被加入调度队列
 }
 
 export class Dependency {

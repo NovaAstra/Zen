@@ -3,7 +3,7 @@ import { type Link, type Node, Flags, Dependency } from "./dependency";
 
 export class Reactive extends Dependency {
   /**
-   * 传播更新到订阅者
+   * 传播脏标记，通知依赖节点
    * @param link 订阅者的链接
    */
   public propagate(link: Link): void {
@@ -33,7 +33,7 @@ export class Reactive extends Dependency {
 
 
   /**
-   * 检查依赖是否脏
+   * 判断依赖链上是否有变更（递归检测脏状态）
    * @param link 依赖链接
    * @param sub 订阅节点
    * @returns 是否需要更新
