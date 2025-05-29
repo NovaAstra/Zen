@@ -59,7 +59,7 @@ export class Deque<T> {
 
   private tail?: Node<T>;
 
-  private size: number = 0;
+  public size: number = 0;
 
   /**
    * 创建双端队列实例
@@ -67,6 +67,42 @@ export class Deque<T> {
    */
   constructor(iterable: Iterable<T> = []) {
     this.push(...iterable);
+  }
+
+  public get(index: number) {
+    const node = this.getNode(index);
+    if (node) return node.value;
+    return;
+  }
+
+  public set(index: number, value: T) {
+    if (index == this.size) {
+      this.push(value);
+      return true;
+    }
+
+    const node = this.getNode(index);
+    if (!node) return false;
+    node.value = value;
+    return true;
+  }
+
+  public has() { }
+
+  public delete() { }
+
+  public at(index: number): T | undefined {
+    if (index < 0) index += this.size;
+    if (index < 0 || index >= this.size) return undefined;
+
+    let node = this.head;
+    let i = 0;
+    while (node && i < index) {
+      node = node.next;
+      i++;
+    }
+
+    return node?.value;
   }
 
   /**
@@ -129,9 +165,69 @@ export class Deque<T> {
     return head.value;
   }
 
-  public toReversed() {
+  /**
+   * 从队首添加元素
+   * @param values 要添加的元素
+   * @returns 添加后队列的长度
+   */
+  public unshift(...values: T[]): number {
+    const [head, tail] = createNodes(values);
 
+    if (this.head) {
+      this.head.prev = tail;
+      tail.next = this.head;
+    } else {
+      this.tail = tail;
+    }
+
+    this.head = head;
+    this.size += values.length;
+    return this.size;
   }
+
+  /**
+   * 拼接两个 Deque 实例，返回新实例
+   * @param other 要拼接的 Deque 或可迭代对象
+   * @returns 拼接后的新 Deque 实例
+   */
+  public concat(other: Iterable<T>): Deque<T> {
+    const deque = new Deque<T>(this);
+    for (const item of other) {
+      deque.push(item);
+    }
+    return deque;
+  }
+
+  /**
+     * 提取部分队列，返回新 Deque
+     * @param start 起始索引（包含）
+     * @param end 结束索引（不包含）
+     * @returns 新的 Deque 实例
+     */
+  public slice(start: number = 0, end: number = this.size): Deque<T> {
+    const deque = new Deque<T>();
+    if (start < 0) start += this.size;
+    if (end < 0) end += this.size;
+
+    let index = 0;
+    let node = this.head;
+
+    while (node && index < end) {
+      if (index >= start) {
+        deque.push(node.value);
+      }
+      node = node.next;
+      index++;
+    }
+
+    return deque;
+  }
+
+  public splice() { }
+
+  public reduce() { }
+
+  public reduceRight() { }
 
   /**
   * 反转当前队列的元素顺序，原地修改
@@ -148,6 +244,108 @@ export class Deque<T> {
     [this.head, this.tail] = [this.tail, this.head];
 
     return this;
+  }
+
+  public keys() { }
+
+  /**
+    * 查找元素是否存在
+    * @param value 要查找的值
+    * @returns 是否存在
+    */
+  public includes(value: T): boolean {
+    for (const item of this) {
+      if (Object.is(item, value)) return true;
+    }
+    return false;
+  }
+
+
+  /**
+   * 查找元素的索引
+   * @param value 要查找的值
+   * @returns 索引值，未找到返回 -1
+   */
+  public indexOf(value: T): number {
+    let index = 0;
+    for (const item of this) {
+      if (Object.is(item, value)) return index;
+      index++;
+    }
+    return -1;
+  }
+
+  /**
+  * 将 Deque 扁平化一层（仅限嵌套的 Deque 或数组）
+  * @returns 扁平化后的 Deque
+  */
+  public flat(): Deque<T> {
+    const deque = new Deque<T>();
+    for (const value of this) {
+      if (Array.isArray(value) || value instanceof Deque) {
+        for (const v of value) deque.push(v);
+      } else {
+        deque.push(value);
+      }
+    }
+    return deque;
+  }
+
+
+  /**
+   * 映射并扁平化
+   * @param callback 映射函数
+   * @returns 扁平化后的 Deque
+   */
+  public flatMap<N>(callback: Callback<T, N[] | Deque<N>>): Deque<N> {
+    const deque = new Deque<N>();
+    let index = 0;
+    let node = this.head;
+
+    while (node) {
+      const mapped = callback(node.value, index, this, node);
+      for (const v of mapped) deque.push(v);
+      node = node.next;
+      index++;
+    }
+
+    return deque;
+  }
+
+  /**
+  * 查找最后一个满足条件的元素
+  * @param callback 条件回调
+  * @returns 找到的元素或 undefined
+  */
+  public findLast(callback: Callback<T>): T | undefined {
+    let index = this.size - 1;
+    let node = this.tail;
+
+    while (node) {
+      if (callback(node.value, index, this, node)) return node.value;
+      node = node.prev;
+      index--;
+    }
+
+    return undefined;
+  }
+
+  /**
+ * 查找最后一个满足条件的元素索引
+ * @param callback 条件回调
+ * @returns 索引或 -1
+ */
+  public findLastIndex(callback: Callback<T>): number {
+    let index = this.size - 1;
+    let node = this.tail;
+
+    while (node) {
+      if (callback(node.value, index, this, node)) return index;
+      node = node.prev;
+      index--;
+    }
+
+    return -1;
   }
 
 
@@ -199,7 +397,7 @@ export class Deque<T> {
       node = node.next;
       index++;
     }
-    return false;
+    return true;
   }
 
   /**
@@ -276,6 +474,88 @@ export class Deque<T> {
     return deque;
   }
 
+  public sort() {
+
+  }
+
+  /**
+   * 以字符串形式连接所有元素
+   * @param separator 分隔符，默认为逗号
+   * @returns 拼接后的字符串
+   */
+  public join(separator: string = ","): string {
+    return this.toArray().join(separator);
+  }
+
+  /**
+ * 使用映射后的值替换指定索引位置的元素
+ * @param index 替换的位置
+ * @param value 新的值
+ * @returns 新的 Deque 实例
+ */
+  public with(index: number, value: T) { }
+
+  public toArray(): T[] {
+    const result: T[] = [];
+    for (const value of this) {
+      result.push(value);
+    }
+    return result;
+  }
+
+  /**
+     * 返回 Deque 的字符串表示形式
+     * @returns 字符串形式
+     */
+  public toString(): string {
+    return this.join();
+  }
+
+  /**
+  * 返回值组成的新数组，按升序排序
+  * @param compareFn 可选，自定义排序函数
+  * @returns 新的 Deque 实例
+  */
+  public toSorted(compareFn?: (a: T, b: T) => number): Deque<T> {
+    return new Deque<T>([...this.toArray()].sort(compareFn));
+  }
+
+  /**
+    * 删除指定位置的若干元素，并用新元素替换，返回新 Deque
+    * @param start 开始索引
+    * @param deleteCount 删除数量
+    * @param items 新插入的元素
+    * @returns 修改后的新 Deque 实例
+    */
+  public toSpliced(start: number, deleteCount: number, ...items: T[]): Deque<T> {
+    const deque = new Deque<T>();
+    let i = 0;
+
+    for (const item of this) {
+      if (i === start) {
+        for (const newItem of items) deque.push(newItem);
+      }
+      if (i < start || i >= start + deleteCount) {
+        deque.push(item);
+      }
+      i++;
+    }
+
+    return deque;
+  }
+
+  public toReversed() {
+    const deque = new Deque<T>();
+    let node = this.tail;
+
+    while (node) {
+      deque.push(node.value);
+      node = node.prev;
+    }
+
+    return deque;
+  }
+
   /**
   * 清空队列，重置状态
   */
@@ -291,6 +571,25 @@ export class Deque<T> {
   public [Symbol.iterator](): Iterator<T> {
     return this.values();
   }
+
+  /**
+ * 获取指定位置的节点（内部使用）
+ * @param index 索引位置
+ * @returns 对应节点或 undefined
+ */
+  private getNode(index: number): Node<T> | undefined {
+    if (index < 0) index += this.size;
+    if (index < 0 || index >= this.size) return undefined;
+
+    let node = this.head;
+    let i = 0;
+    while (node && i < index) {
+      node = node.next;
+      i++;
+    }
+    return node;
+  }
+
 
   /**
   * 生成器函数，依次返回队列元素
