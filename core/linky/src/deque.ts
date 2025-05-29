@@ -23,13 +23,13 @@ class Node<T> {
   /**
    * 创建一个节点
    * @param value 节点存储的值
-   * @param prev 指向前一个节点的引用
-   * @param next 指向后一个节点的引用
+   * @param prev 前一个节点引用
+   * @param next 后一个节点引用
    */
-  public constructor(
+  constructor(
     public value: T,
-    public prev?: Node<T>,
-    public next?: Node<T>
+    public prev: Node<T> | undefined = undefined,
+    public next: Node<T> | undefined = undefined
   ) { }
 }
 
@@ -60,23 +60,23 @@ function createNodes<T>(values: T[]): [head: Node<T>, tail: Node<T>] {
  * @template T 队列元素类型
  */
 export class Deque<T> {
-  private head?: Node<T>;  // 队列头部节点
-  private tail?: Node<T>;  // 队列尾部节点
+  private head?: Node<T>; // 队列头部节点
+  private tail?: Node<T>; // 队列尾部节点
   public size: number = 0; // 队列当前大小
 
   /**
-     * 创建双端队列实例
-     * @param iterable 可选，初始化的可迭代元素集合
-     */
+   * 创建双端队列实例
+   * @param iterable 可选，初始化的可迭代元素集合
+   */
   public constructor(iterable: Iterable<T> = []) {
     this.push(...iterable);
   }
 
   /**
- * 获取指定索引位置的元素值
- * @param index 要获取的索引位置
- * @returns 元素值或undefined(如果索引无效)
- */
+   * 获取指定索引位置的元素值
+   * @param index 要获取的索引位置
+   * @returns 元素值或undefined(如果索引无效)
+   */
   public get(index: number): T | undefined {
     return this.getNode(index)?.value;
   }
@@ -98,7 +98,6 @@ export class Deque<T> {
     node.value = value;
     return true;
   }
-
 
   /**
    * 检查队列中是否包含指定值
@@ -129,10 +128,10 @@ export class Deque<T> {
   }
 
   /**
- * 获取指定索引位置的元素(支持负数索引)
- * @param index 索引位置(负数表示从末尾开始计算)
- * @returns 元素值或undefined(如果索引无效)
- */
+   * 获取指定索引位置的元素(支持负数索引)
+   * @param index 索引位置(负数表示从末尾开始计算)
+   * @returns 元素值或undefined(如果索引无效)
+   */
   public at(index: number): T | undefined {
     if (index < 0) index += this.size;
     if (index < 0 || index >= this.size) return undefined;
@@ -147,7 +146,8 @@ export class Deque<T> {
    */
   public remove(
     value: T,
-    predicate: Callback<T> = (value, _, __, node) => Object.is(value, node.value)
+    predicate: Callback<T> = (value, _, __, node) =>
+      Object.is(value, node.value)
   ): boolean {
     let node = this.head;
     let index = 0;
@@ -162,11 +162,11 @@ export class Deque<T> {
   }
 
   /**
- * 删除所有匹配指定条件的元素
- * @param value 要删除的值
- * @param predicate 自定义匹配函数(可选)
- * @returns 删除的元素数量
- */
+   * 删除所有匹配指定条件的元素
+   * @param value 要删除的值
+   * @param predicate 自定义匹配函数(可选)
+   * @returns 删除的元素数量
+   */
   public removeAll(
     value: T,
     predicate: Callback<T> = (val, _, __, node) => Object.is(val, node.value)
@@ -176,7 +176,7 @@ export class Deque<T> {
     let index = 0;
 
     while (node) {
-      const nextNode = node.next;
+      const next = node.next;
       if (predicate(value, index, this, node)) {
         this.delete(index);
         count++;
@@ -184,7 +184,7 @@ export class Deque<T> {
       } else {
         index++;
       }
-      node = nextNode;
+      node = next;
     }
 
     return count;
@@ -268,13 +268,13 @@ export class Deque<T> {
   }
 
   /**
-   * 拼接两个 Deque 实例，返回新实例
-   * @param other 要拼接的 Deque 或可迭代对象
-   * @returns 拼接后的新 Deque 实例
+   * 拼接可迭代对象
+   * @param iterable 可迭代对象
+   * @returns 新 Deque 实例
    */
   public concat(iterable: Iterable<T>): Deque<T> {
     const deque = new Deque<T>(this);
-    for (const item of iterable) deque.push(item);
+    deque.push(...iterable);
     return deque;
   }
 
@@ -302,16 +302,17 @@ export class Deque<T> {
   }
 
   /**
-   * 删除并插入元素
-   * @param start 起始位置
+   * 删除并插入元素，返回被删除的元素
+   * @param start 开始索引
    * @param deleteCount 删除数量
-   * @param items 插入的新元素
+   * @param items 新插入元素
    * @returns 被删除的元素组成的新 Deque
    */
   public splice(start: number, deleteCount: number, ...items: T[]): Deque<T> {
-    const deleted = new Deque<T>();
     if (start < 0) start += this.size;
+    if (start < 0 || start > this.size) return new Deque<T>();
 
+    const deleted = new Deque<T>();
     let node = this.getNode(start);
     for (let i = 0; i < deleteCount && node; i++) {
       deleted.push(node.value);
@@ -320,23 +321,28 @@ export class Deque<T> {
       node = next;
     }
 
-    if (items.length > 0) {
+    if (items.length) {
+      const nodes = items.map((value) => new Node<T>(value));
+      for (let i = 0; i < nodes.length - 1; i++) {
+        nodes[i].next = nodes[i + 1];
+        nodes[i + 1].prev = nodes[i];
+      }
+
       const nextNode = this.getNode(start);
       const prevNode = nextNode?.prev ?? this.tail;
-      const [newHead, newTail] = createNodes(items);
 
       if (prevNode) {
-        prevNode.next = newHead;
-        newHead.prev = prevNode;
+        prevNode.next = nodes[0];
+        nodes[0].prev = prevNode;
       } else {
-        this.head = newHead;
+        this.head = nodes[0];
       }
 
       if (nextNode) {
-        nextNode.prev = newTail;
-        newTail.next = nextNode;
+        nextNode.prev = nodes[nodes.length - 1];
+        nodes[nodes.length - 1].next = nextNode;
       } else {
-        this.tail = newTail;
+        this.tail = nodes[nodes.length - 1];
       }
 
       this.size += items.length;
@@ -346,8 +352,8 @@ export class Deque<T> {
   }
 
   /**
-   * 聚合计算值
-   * @param callback 回调函数
+   * 聚合计算
+   * @param callback 聚合函数
    * @param initial 初始值
    * @returns 聚合结果
    */
@@ -357,8 +363,10 @@ export class Deque<T> {
   ): U {
     let acc = initial;
     let index = 0;
-    for (const value of this) {
-      acc = callback(acc, value, index, this);
+    let node = this.head;
+    while (node) {
+      acc = callback(acc, node.value, index, this);
+      node = node.next;
       index++;
     }
     return acc;
@@ -386,16 +394,15 @@ export class Deque<T> {
   }
 
   /**
-   * 反转当前队列的元素顺序，原地修改
-   * @returns 返回当前队列实例
+   * 反转队列（原地操作）
+   * @returns 当前 Deque 实例
    */
   public reverse() {
     let node = this.head;
 
     while (node) {
-      const { prev, next } = node;
-      [node.prev, node.next] = [next, prev];
-      node = next;
+      [node.prev, node.next] = [node.next, node.prev];
+      node = node.next;
     }
     [this.head, this.tail] = [this.tail, this.head];
 
@@ -429,17 +436,20 @@ export class Deque<T> {
   }
 
   /**
-   * 将 Deque 扁平化一层（仅限嵌套的 Deque 或数组）
-   * @returns 扁平化后的 Deque
+   * 扁平化嵌套 Deque 或数组
+   * @returns 新 Deque 实例
    */
   public flat(): Deque<T> {
     const deque = new Deque<T>();
-    for (const value of this) {
+    let node = this.head;
+    while (node) {
+      const value = node.value;
       if (Array.isArray(value) || value instanceof Deque) {
-        for (const v of value) deque.push(v);
+        deque.push(...value);
       } else {
         deque.push(value);
       }
+      node = node.next;
     }
     return deque;
   }
@@ -456,7 +466,7 @@ export class Deque<T> {
 
     while (node) {
       const mapped = callback(node.value, index, this, node);
-      for (const v of mapped) deque.push(v);
+      deque.push(...mapped);
       node = node.next;
       index++;
     }
@@ -624,6 +634,11 @@ export class Deque<T> {
     return deque;
   }
 
+  /**
+   * 排序队列（原地操作）
+   * @param compareFn 比较函数
+   * @returns 当前 Deque 实例
+   */
   public sort(compareFn?: (a: T, b: T) => number): this {
     const sorted = this.toArray().sort(compareFn);
     this.clear();
@@ -632,12 +647,18 @@ export class Deque<T> {
   }
 
   /**
-   * 以字符串形式连接所有元素
-   * @param separator 分隔符，默认为逗号
-   * @returns 拼接后的字符串
+   * 连接元素为字符串
+   * @param separator 分隔符
+   * @returns 拼接字符串
    */
   public join(separator: string = ","): string {
-    return this.toArray().join(separator);
+    let result = "";
+    let node = this.head;
+    while (node) {
+      result += (node === this.head ? "" : separator) + String(node.value);
+      node = node.next;
+    }
+    return result;
   }
 
   /**
@@ -652,10 +673,16 @@ export class Deque<T> {
     return deque;
   }
 
+  /**
+   * 转换为数组
+   * @returns 元素数组
+   */
   public toArray(): T[] {
     const result: T[] = [];
-    for (const value of this) {
-      result.push(value);
+    let node = this.head;
+    while (node) {
+      result.push(node.value);
+      node = node.next;
     }
     return result;
   }
@@ -678,11 +705,11 @@ export class Deque<T> {
   }
 
   /**
-   * 删除指定位置的若干元素，并用新元素替换，返回新 Deque
+   * 返回删除并插入后的新队列
    * @param start 开始索引
    * @param deleteCount 删除数量
-   * @param items 新插入的元素
-   * @returns 修改后的新 Deque 实例
+   * @param items 新插入元素
+   * @returns 新 Deque 实例
    */
   public toSpliced(
     start: number,
@@ -691,20 +718,27 @@ export class Deque<T> {
   ): Deque<T> {
     const deque = new Deque<T>();
     let i = 0;
+    let node = this.head;
 
-    for (const item of this) {
+    while (node) {
       if (i === start) {
-        for (const newItem of items) deque.push(newItem);
+        deque.push(...items);
       }
       if (i < start || i >= start + deleteCount) {
-        deque.push(item);
+        deque.push(node.value);
       }
+      node = node.next;
       i++;
     }
 
+    if (i <= start) deque.push(...items);
     return deque;
   }
 
+  /**
+   * 返回反转后的新队列
+   * @returns 新 Deque 实例
+   */
   public toReversed() {
     const deque = new Deque<T>();
     let node = this.tail;
@@ -744,14 +778,15 @@ export class Deque<T> {
    */
   public *values(): Iterator<T> {
     let node = this.head;
-
     while (node) {
       yield node.value;
-
       node = node.next;
     }
   }
 
+  /**
+   * 返回索引迭代器
+   */
   public *keys(): IterableIterator<number> {
     for (let i = 0; i < this.size; i++) {
       yield i;
