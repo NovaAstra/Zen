@@ -2,6 +2,9 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    "types": [
+      "vitest/globals"
+    ]
   }
 }

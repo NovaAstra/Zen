@@ -144,4 +144,80 @@ describe("双端队列", () => {
     const filtered = deque.filter((x) => x % 2 === 0);
     expect(filtered.toArray()).toEqual([2, 4]);
   });
+
+  it('替换指定索引元素', () => {
+    deque.push(1, 2, 3);
+    const newDeque = deque.with(1, 5);
+    expect(newDeque.toArray()).toEqual([1, 5, 3]);
+    expect(deque.toArray()).toEqual([1, 2, 3]); // 原队列不变
+  });
+
+  it('替换头元素', () => {
+    deque.push(1, 2, 3);
+    const newDeque = deque.with(0, 4);
+    expect(newDeque.toArray()).toEqual([4, 2, 3]);
+  });
+
+  it('替换尾元素', () => {
+    deque.push(1, 2, 3);
+    const newDeque = deque.with(2, 6);
+    expect(newDeque.toArray()).toEqual([1, 2, 6]);
+  });
+
+  it('替换负索引元素', () => {
+    deque.push(1, 2, 3);
+    const newDeque = deque.with(-1, 7);
+    expect(newDeque.toArray()).toEqual([1, 2, 7]);
+  });
+
+  it('无效索引不抛异常，返回新队列', () => {
+    deque.push(1, 2, 3);
+    const newDeque = deque.with(3, 8);
+    expect(newDeque.toArray()).toEqual([1, 2, 3, 8]); // 追加到末尾
+    expect(deque.toArray()).toEqual([1, 2, 3]); // 原队列不变
+  });
+
+  it('负索引超出范围，返回新队列', () => {
+    deque.push(1, 2, 3);
+    const newDeque = deque.with(-5, 9);
+    expect(newDeque.toArray()).toEqual([1, 2, 3]); // 无效索引，原样返回
+  });
+
+  it('空队列替换索引0', () => {
+    const newDeque = deque.with(0, 1);
+    expect(newDeque.toArray()).toEqual([1]);
+    expect(deque.toArray()).toEqual([]);
+  });
+
+  it('空队列返回空字符串', () => {
+    expect(deque.join()).toBe('');
+  });
+
+  it('单元素队列无分隔符', () => {
+    deque.push(1);
+    expect(deque.join()).toBe('1');
+  });
+
+  it('多元素队列使用默认逗号分隔', () => {
+    deque.push(1, 2, 3);
+    expect(deque.join()).toBe('1,2,3');
+  });
+
+  it('多元素队列使用自定义分隔符', () => {
+    deque.push(1, 2, 3);
+    expect(deque.join('-')).toBe('1-2-3');
+  });
+
+  it('字符串元素正确拼接', () => {
+    expect(new Deque<string>(['a', 'b', 'c']).join('|')).toBe('a|b|c');
+  });
+
+  it('混合类型元素转换为字符串', () => {
+    expect(new Deque<number | string | boolean>([1, 'two', true]).join(' ')).toBe('1 two true');
+  });
+
+  it('空分隔符直接拼接', () => {
+    deque.push(1, 2, 3);
+    expect(deque.join('')).toBe('123');
+  });
 })

@@ -6,6 +6,7 @@
   "sideEffects": false,
   "main": "src/index.ts",
   "scripts": {
-    "test": "vitest --workspace ../../vitest.workspace.ts run"
+    "test": "vitest --workspace ../../vitest.workspace.ts run",
+    "coverage": "vitest --workspace ../../vitest.workspace.ts run --coverage"
   }
 }
