@@ -1,6 +1,9 @@
 {
   "name": "zen",
   "version": "0.0.1",
-  "private": false,
-  "type": "module"
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "vitest": "^3.1.4"
+  }
 }
