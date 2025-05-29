@@ -8,9 +8,17 @@ importers:
 
   .: {}
 
+  core/linky: {}
+
   ui/headless: {}
 
   ui/react: {}
+
+  ui/reactivity:
+    dependencies:
+      '@zen-core/linky':
+        specifier: workspace:*
+        version: link:../../core/linky
 
   ui/shared: {}
 

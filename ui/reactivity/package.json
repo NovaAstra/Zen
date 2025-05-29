@@ -1,5 +1,9 @@
 {
   "name": "@zen-ui/reactivity",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@zen-core/linky": "workspace:*"
+  }
 }

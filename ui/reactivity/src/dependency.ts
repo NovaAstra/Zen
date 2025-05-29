@@ -1,4 +1,4 @@
-import { type Deque } from "./deque";
+import { type Deque } from "@zen-core/linky";
 
 export interface Node {
   deps: Deque<Link>;
