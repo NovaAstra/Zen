@@ -1,8 +1,16 @@
-import { Signal } from "./signal"
+import { Link } from "./dependency";
 
-export function reactive<T>(initialValue?: T) {
-  const signal = new Signal<T>(initialValue as T)
-  return
+export class Reactive {
+
+  /**
+   * 传播更新到订阅者
+   * @param link 订阅者的链接
+   */
+  public propagate(link: Link): void {
+
+  }
+
+  public track() { }
+
+  public cleanup() { }
 }
-
-const count = reactive(1)

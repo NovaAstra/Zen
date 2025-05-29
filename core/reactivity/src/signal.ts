@@ -3,7 +3,6 @@ import { Deque } from "@zen-core/linky";
 
 export class Signal<T> implements Node {
   public value: T;
-
   public previousValue: T;
 
   public flags: Flags = 1 satisfies Flags.Mutable;
