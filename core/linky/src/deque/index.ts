@@ -60,8 +60,8 @@ function createNodes<T>(values: T[]): [head: Node<T>, tail: Node<T>] {
  * @template T 队列元素类型
  */
 export class Deque<T> {
-  private head?: Node<T>; // 队列头部节点
-  private tail?: Node<T>; // 队列尾部节点
+  public head?: Node<T>; // 队列头部节点
+  public tail?: Node<T>; // 队列尾部节点
   public size: number = 0; // 队列当前大小
 
   /**
@@ -402,7 +402,7 @@ export class Deque<T> {
 
     while (node) {
       [node.prev, node.next] = [node.next, node.prev];
-      node = node.next;
+      node = node.prev;
     }
     [this.head, this.tail] = [this.tail, this.head];
 

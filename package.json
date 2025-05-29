@@ -3,7 +3,11 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "scripts": {
+    "test": "pnpm -r --if-present test"
+  },
   "devDependencies": {
+    "typescript": "^5.8.3",
     "vitest": "^3.1.4"
   }
 }

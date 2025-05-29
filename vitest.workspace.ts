@@ -1,6 +1,12 @@
-import {defineWorkspace } from 'vitest/config'
+import { defineWorkspace } from 'vitest/config'
 
 export default defineWorkspace([
-  'core/*',
-  'ui/*',
+  {
+    test: {
+      name: 'unit',
+      include: ['**/*.test.ts'],
+      environment: 'node',
+      globals: true,
+    },
+  },
 ])
