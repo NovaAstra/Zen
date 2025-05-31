@@ -26,7 +26,11 @@ importers:
         specifier: workspace:*
         version: link:../linky
 
-  ui/headless: {}
+  ui/headless:
+    dependencies:
+      '@zen-core/linky':
+        specifier: workspace:*
+        version: link:../../core/linky
 
   ui/react: {}
 

@@ -1,5 +1,9 @@
 {
   "name": "@zen-ui/headless",
   "version": "0.0.1",
-  "private": true
+  "private": true,
+  "sideEffects": false,
+  "dependencies": {
+    "@zen-core/linky": "workspace:*"
+  }
 }
