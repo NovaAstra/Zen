@@ -20,9 +20,7 @@ Object.defineProperty(Signal.prototype, 'value', {
     return this._value;
   },
   set<T>(this: Signal<T>, value: T) {
-    console.log(12)
     if (Object.is(this._value, value)) return;
-    console.log(1)
     this._value = value;
   },
   configurable: true,

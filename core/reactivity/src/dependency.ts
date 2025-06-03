@@ -16,10 +16,9 @@ export enum Flags {
   Mutable = 1 << 0,       // 可变实体（如 signal）
   Watching = 1 << 1,      // 正在监听（如 effect）
   RecursedCheck = 1 << 2, // 开启递归检查依赖链
-  Recursed = 1 << 3,      // 当前在递归中
-  Dirty = 1 << 4,         // 脏状态（值发生了变化）
-  Pending = 1 << 5,       // 可能需要更新（懒更新的中间态）
-  Queued = 1 << 6         // 副作用是否已被加入调度队列
+  Recursed = 1 << 3,      // 已递归
+  Dirty = 1 << 4,         // 数据已脏(需要更新)
+  Pending = 1 << 5,       // 待处理状态
 }
 
 export class Dependency {
