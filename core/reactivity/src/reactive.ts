@@ -15,8 +15,7 @@ export class Reactive extends Dependency {
    * @param sub 订阅节点
    */
   public track(sub: Node) {
-    sub.deps.clear();
-    sub.flags = (sub.flags & ~(Flags.Recursed | Flags.Dirty | Flags.Pending)) | Flags.RecursedCheck;
+   
   }
 
   /**
@@ -24,11 +23,7 @@ export class Reactive extends Dependency {
     * @param sub 订阅节点
     */
   public cleanup(sub: Node): void {
-    while (sub.deps.size > 0) {
-      const link = sub.deps.at(0)!;
-      this.unlink(link, sub);
-    }
-    sub.flags &= ~Flags.RecursedCheck;
+   
   }
 
 
@@ -48,17 +43,6 @@ export class Reactive extends Dependency {
  * @param node 节点
  */
   public markDirty(node: Node) {
-    node.flags |= Flags.Dirty;
-    let current = node.subs.at(0);
-    while (current) {
-      const sub = current.sub;
-      const flags = sub.flags;
-      if ((flags & (Flags.Pending | Flags.Dirty)) === Flags.Pending) {
-        sub.flags |= Flags.Dirty;
-        if (flags & Flags.Watching) {
-
-        }
-      }
-    }
+  
   }
 }
