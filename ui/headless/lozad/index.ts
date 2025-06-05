@@ -21,17 +21,6 @@ export enum Visibility {
   Visible
 }
 
-export class Queue {
-  public get size() {
-    return 0
-  }
-
-  public push() { }
-
-  public shift() { }
-
-  public clear() { }
-}
 
 export class Memory {
   public constructor(public readonly lozad: Lozad<Component, Metric>) { }
