@@ -22,14 +22,15 @@ export class DAG<T extends Node> {
     return this.nodes.size;
   }
 
-  public addNode(node: T, override: boolean = false): void {
+  public add(node: T, override: boolean = false): void {
     if (!this.has(node.id) || override) {
       this.nodes.set(node.id, node);
-      this.paths.clear();
+      this.evict(node.id);
     };
   }
 
-  public getNode(id: string): T | undefined {
+
+  public get(id: string): T | undefined {
     return this.nodes.get(id);
   }
 
@@ -38,9 +39,8 @@ export class DAG<T extends Node> {
   }
 
   public delete(id: string): boolean {
-    if (!this.has(id)) return false;
-
-    const node = this.nodes.get(id)!;
+    const node = this.nodes.get(id);
+    if (!node) return false;
 
     for (const depId of node.dependencies) {
       this.nodes.get(depId)?.dependents.delete(id);
@@ -50,7 +50,7 @@ export class DAG<T extends Node> {
       this.nodes.get(dependentId)?.dependencies.delete(id);
     }
 
-    this.paths.clear();
+    this.evict(node.id);
     return this.nodes.delete(id);
   }
 
@@ -59,12 +59,12 @@ export class DAG<T extends Node> {
     this.paths.clear();
   }
 
-  public addDependency(sourceId: string, targetId: string): boolean {
-    const source = this.getNode(sourceId);
-    const target = this.getNode(targetId);
+  public link(sourceId: string, targetId: string): boolean {
+    const source = this.get(sourceId);
+    const target = this.get(targetId);
 
     if (!source || !target) return false;
-    if (this.wouldCreateCycle(sourceId, targetId)) return false
+    if (this.cycle(sourceId, targetId)) return false
 
     source.dependencies.add(targetId);
     target.dependents.add(sourceId);
@@ -73,11 +73,13 @@ export class DAG<T extends Node> {
     return true;
   }
 
-  public deleteDependency(sourceId: string, targetId: string): boolean {
+
+  public unlink(sourceId: string, targetId: string): boolean {
     const source = this.nodes.get(sourceId);
     const target = this.nodes.get(targetId);
 
-    if (!source || !target || !source.dependencies.has(targetId)) return false;
+    if (!source || !target) return false;
+    if (!source.dependencies.has(targetId)) return false;
 
     source.dependencies.delete(targetId);
     target.dependents.delete(sourceId);
@@ -86,37 +88,48 @@ export class DAG<T extends Node> {
     return true;
   }
 
-  public order(sourceId?: string, direction: Direction = 'dependencies', topo: boolean = true): string[] {
-    const result: string[] = [];
-    const visited = new Set<string>();
-    const stack = new Set<string>();
+  public order(sourceId?: string, direction: Direction = 'dependents'): string[] {
+    const scope = sourceId ? this.getPaths(sourceId) : new Set(this.nodes.keys());
 
-    const visit = (id: string) => {
-      if (visited.has(id)) return;
-      visited.add(id);
-      stack.add(id);
+    const degree = new Map<string, number>();
+    for (const id of scope) degree.set(id, 0);
 
-      const node = this.getNode(id);
-      if (!node) return;
-
-      const edges = direction === 'dependencies' ? node.dependencies : node.dependents;
-      for (const nextId of edges) {
-        if (!stack.has(nextId)) visit(nextId);
-      }
-
-      stack.delete(id);
-      result.push(id);
-    };
-
-    if (sourceId) {
-      visit(sourceId);
-    } else {
-      for (const id of this.nodes.keys()) {
-        visit(id);
+    for (const id of scope) {
+      const node = this.get(id)!;
+      const incomingNodes = direction === 'dependencies' ? node.dependents : node.dependencies;
+      for (const incoming of incomingNodes) {
+        if (scope.has(incoming)) {
+          degree.set(id, (degree.get(id) ?? 0) + 1);
+        }
       }
     }
 
-    return topo ? result.reverse() : result;
+    const queue: string[] = [];
+    for (const [id, deg] of degree) {
+      if (deg === 0) queue.push(id);
+    }
+
+    const result: string[] = [];
+
+    while (queue.length) {
+      const id = queue.shift()!;
+      result.push(id);
+
+      const node = this.get(id)!;
+      const outgoingNodes = direction === 'dependencies' ? node.dependencies : node.dependents;
+      for (const adj of outgoingNodes) {
+        if (!scope.has(adj)) continue;
+        const deg = (degree.get(adj) ?? 0) - 1;
+        degree.set(adj, deg);
+        if (deg === 0) queue.push(adj);
+      }
+    }
+
+    if (result.length !== scope.size) {
+      throw new Error('Graph contains at least one cycle');
+    }
+
+    return result;
   }
 
   protected hasPath(sourceId: string, targetId: string): boolean {
@@ -124,44 +137,58 @@ export class DAG<T extends Node> {
   }
 
   protected getPaths(sourceId: string): Set<string> {
-    if (this.paths.has(sourceId)) return this.paths.get(sourceId)!;
-
-    const visited = new Set<string>();
-    this.forEach(sourceId, i => { visited.add(i) });
-
-    this.paths.set(sourceId, visited);
-    return visited;
+    if (this.paths.has(sourceId)) return this.paths.get(sourceId)!
+    const visited = new Set<string>()
+    this.dfs(sourceId, visited)
+    this.paths.set(sourceId, visited)
+    return visited
   }
 
   protected forEach(sourceId: string, callback: (id: string) => boolean | void): void {
-    this.dfs(sourceId, new Set(), new Set(), callback);
+    this.traverse(sourceId, callback)
   }
 
-  private wouldCreateCycle(sourceId: string, targetId: string): boolean {
+  private cycle(sourceId: string, targetId: string): boolean {
     return this.hasPath(targetId, sourceId);
   }
 
-  private dfs(
-    id: string,
-    visited: Set<string>,
-    stack: Set<string>,
-    callback: (id: string) => boolean | void
-  ): boolean {
-    if (visited.has(id)) return false;
-    visited.add(id);
-    stack.add(id);
+  private dfs(sourceId: string, visited: Set<string>): void {
+    this.traverse(sourceId, id => {
+      visited.add(id)
+    })
+  }
 
-    const node = this.getNode(id);
-    if (node) {
+  private traverse(sourceId: string, callback: (id: string) => boolean | void): void {
+    const visited = new Set<string>()
+    const stack = [sourceId]
+
+    while (stack.length) {
+      const id = stack.pop()!
+      if (visited.has(id)) continue
+      visited.add(id)
+
+      const stop = callback(id)
+      if (stop === false) break
+
+      const node = this.get(id)
+      if (!node) continue
+
       for (const dep of node.dependencies) {
-        if (stack.has(dep)) return true;
-        if (this.dfs(dep, visited, stack, callback)) return true;
+        if (!visited.has(dep)) stack.push(dep)
       }
     }
+  }
 
-    callback(id);
-    stack.delete(id);
-    return false;
+  private evict(id: string): void {
+    const toDelete: string[] = []
+    for (const [key, reachable] of this.paths.entries()) {
+      if (key === id || reachable.has(id)) {
+        toDelete.push(key)
+      }
+    }
+    for (const key of toDelete) {
+      this.paths.delete(key)
+    }
   }
 }
 
@@ -196,11 +223,12 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
 
   public async run(id: string, version: number = this.version, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) return;
-    await this.waitResumeResolvers();
+    await this.waitResume();
 
-    if (signal?.aborted) return;
+    if (signal?.aborted || version !== this.version) return;
+
     const node = this.tryActive(id);
-    if (node === false || version !== this.version) return;
+    if (node === false) return;
 
     const depsData = this.getDependencyData(id);
 
@@ -231,7 +259,7 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
 
     const affected = this.order(id, 'dependents');
     for (const nodeId of affected) {
-      const node = this.getNode(nodeId);
+      const node = this.get(nodeId);
       if (node) {
         node.status = Status.Waiting;
         node.onReset?.(node);
@@ -252,19 +280,19 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
     this.resumeResolvers.length = 0;
   }
 
-  private async waitResumeResolvers(): Promise<void> {
-    if (!this.paused) return;
+  private async waitResume(): Promise<void> {
+    if (!this.paused) return Promise.resolve();
     return new Promise<void>((resolve) => {
       this.resumeResolvers.push(resolve);
     });
   }
 
   private tryActive(id: string): false | T {
-    const node = this.getNode(id);
+    const node = this.get(id);
     if (!node || node.status !== Status.Waiting) return false;
 
     for (const depId of node.dependencies) {
-      const dep = this.getNode(depId);
+      const dep = this.get(depId);
       if (!dep || dep.status !== Status.Success) return false;
     }
 
@@ -274,11 +302,11 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
 
   private getDependencyData(id: string): Record<string, D> {
     const data: Record<string, D> = {};
-    const node = this.getNode(id);
+    const node = this.get(id);
     if (!node) return data;
 
     for (const depId of node.dependencies) {
-      const depNode = this.getNode(depId);
+      const depNode = this.get(depId);
       if (depNode && depNode.status === Status.Success && depNode.data !== undefined) {
         data[depId] = depNode.data;
       }
