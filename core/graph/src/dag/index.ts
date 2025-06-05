@@ -88,7 +88,7 @@ export class DAG<T extends Node> {
     return true;
   }
 
-  public order(sourceId?: string, direction: Direction = 'dependents'): string[] {
+  public order(sourceId?: string, direction: Direction = 'dependencies'): string[] {
     const scope = sourceId ? this.getPaths(sourceId) : new Set(this.nodes.keys());
 
     const degree = new Map<string, number>();
@@ -228,6 +228,7 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
     if (signal?.aborted || version !== this.version) return;
 
     const node = this.tryActive(id);
+    console.log(node)
     if (node === false) return;
 
     const depsData = this.getDependencyData(id);
@@ -289,10 +290,13 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
 
   private tryActive(id: string): false | T {
     const node = this.get(id);
+
     if (!node || node.status !== Status.Waiting) return false;
 
     for (const depId of node.dependencies) {
       const dep = this.get(depId);
+      console.log(dep, dep!.status !== Status.Success, !dep, "node")
+
       if (!dep || dep.status !== Status.Success) return false;
     }
 
