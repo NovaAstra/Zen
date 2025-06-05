@@ -103,10 +103,9 @@ export default {
     for (const edge of this.edges) {
       const from = this.nodes[edge.from].label;
       const to = this.nodes[edge.to].label;
-      this.dag.link(from, to);
+      this.dag.link(to, from);
     }
 
-    console.log(this.dag.order())
   },
   methods: {
     runFrom(label) {

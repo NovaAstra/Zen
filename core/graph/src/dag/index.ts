@@ -96,7 +96,7 @@ export class DAG<T extends Node> {
 
     for (const id of scope) {
       const node = this.get(id)!;
-      const incomingNodes = direction === 'dependencies' ? node.dependents : node.dependencies;
+      const incomingNodes = direction === 'dependencies' ? node.dependencies : node.dependents;
       for (const incoming of incomingNodes) {
         if (scope.has(incoming)) {
           degree.set(id, (degree.get(id) ?? 0) + 1);
@@ -116,7 +116,7 @@ export class DAG<T extends Node> {
       result.push(id);
 
       const node = this.get(id)!;
-      const outgoingNodes = direction === 'dependencies' ? node.dependencies : node.dependents;
+      const outgoingNodes = direction === 'dependencies' ? node.dependents : node.dependencies;
       for (const adj of outgoingNodes) {
         if (!scope.has(adj)) continue;
         const deg = (degree.get(adj) ?? 0) - 1;
@@ -228,7 +228,6 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
     if (signal?.aborted || version !== this.version) return;
 
     const node = this.tryActive(id);
-    console.log(node)
     if (node === false) return;
 
     const depsData = this.getDependencyData(id);
@@ -259,6 +258,9 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
     this.version++;
 
     const affected = this.order(id, 'dependents');
+    console.log(affected, "affected")
+
+
     for (const nodeId of affected) {
       const node = this.get(nodeId);
       if (node) {
@@ -295,8 +297,6 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
 
     for (const depId of node.dependencies) {
       const dep = this.get(depId);
-      console.log(dep, dep!.status !== Status.Success, !dep, "node")
-
       if (!dep || dep.status !== Status.Success) return false;
     }
 

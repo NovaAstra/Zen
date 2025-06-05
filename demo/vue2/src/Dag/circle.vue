@@ -6,6 +6,7 @@
     :fill="fillColor"
     stroke="steelblue"
     stroke-width="2"
+    @click.prevent="handleClick"
   />
 </template>
 
@@ -20,9 +21,14 @@ export default {
       required: true,
     },
   },
+  data() {
+    return {
+      status: 0,
+    };
+  },
   computed: {
     fillColor() {
-      const status = this.node._state?.status;
+      const status = this.status;
       switch (status) {
         case Status.Running:
           return "orange";
@@ -41,20 +47,31 @@ export default {
     this.node._state = stateNode;
 
     stateNode.onLoad = async (deps, node) => {
-      console.log(`[Load] ${node.id}`, deps);
-      await new Promise((r) => setTimeout(r, 500)); 
+      await new Promise((r) => setTimeout(r, 2000));
     };
     stateNode.onSuccess = (deps, node) => {
-      console.log(`[Success] ${node.id}`);
+      this.status = node.status;
     };
     stateNode.onFailed = (err, deps, node) => {
-      console.log(`[Failed] ${node.id}`, err);
+      this.status = node.status;
     };
     stateNode.onFinished = (deps, node) => {
-      console.log(`[Finished] ${node.id}`);
+      this.status = node.status;
     };
-    
+    stateNode.onReset = (node) => {
+      this.status = node.status;
+    };
+
     this.root.dag.add(stateNode);
+  },
+  methods: {
+    handleClick() {
+      const stateNode = this.node;
+      console.log(stateNode);
+      if (stateNode) {
+        this.root.dag.restart(stateNode.label);
+      }
+    },
   },
 };
 </script>
