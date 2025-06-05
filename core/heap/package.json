@@ -1,9 +1,8 @@
 {
-  "name": "@zen-core/reactivity",
+  "name": "@zen-core/heap",
   "version": "0.0.1",
   "type": "module",
   "private": true,
   "sideEffects": false,
-  "dependencies": {
-  }
+  "main": "src/index.ts"
 }

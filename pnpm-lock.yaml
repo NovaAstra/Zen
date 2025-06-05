@@ -18,19 +18,17 @@ importers:
         specifier: ^3.1.4
         version: 3.1.4
 
-  core/linky: {}
+  core/heap: {}
 
-  core/reactivity:
+  core/queue:
     dependencies:
-      '@zen-core/linky':
+      '@zen-core/heap':
         specifier: workspace:*
-        version: link:../linky
+        version: link:../heap
 
-  ui/headless:
-    dependencies:
-      '@zen-core/linky':
-        specifier: workspace:*
-        version: link:../../core/linky
+  core/reactivity: {}
+
+  ui/headless: {}
 
   ui/react: {}
 

@@ -1,9 +1,11 @@
 {
-  "name": "@zen-core/reactivity",
+  "name": "@zen-core/queue",
   "version": "0.0.1",
   "type": "module",
   "private": true,
   "sideEffects": false,
+  "main": "src/index.ts",
   "dependencies": {
+    "@zen-core/heap": "workspace:*"
   }
 }
