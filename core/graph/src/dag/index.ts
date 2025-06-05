@@ -5,6 +5,8 @@ export enum Status {
   Failed
 }
 
+export type Direction = 'dependencies' | 'dependents'
+
 export class Node {
   public readonly dependencies: Set<string> = new Set();
   public readonly dependents: Set<string> = new Set();
@@ -14,13 +16,17 @@ export class Node {
 
 export class DAG<T extends Node> {
   private readonly nodes: Map<string, T> = new Map();
+  private readonly paths: Map<string, Set<string>> = new Map();
 
   public get size(): number {
     return this.nodes.size;
   }
 
   public addNode(node: T, override: boolean = false): void {
-    if (!this.has(node.id) || override) this.nodes.set(node.id, node);
+    if (!this.has(node.id) || override) {
+      this.nodes.set(node.id, node);
+      this.paths.clear();
+    };
   }
 
   public getNode(id: string): T {
@@ -44,11 +50,13 @@ export class DAG<T extends Node> {
       this.nodes.get(dependentId)?.dependencies.delete(id);
     }
 
+    this.paths.clear();
     return this.nodes.delete(id);
   }
 
   public clear(): void {
     this.nodes.clear();
+    this.paths.clear();
   }
 
   public addDependency(sourceId: string, targetId: string): boolean {
@@ -56,11 +64,12 @@ export class DAG<T extends Node> {
     const target = this.getNode(targetId);
 
     if (!source || !target) return false;
-
     if (this.wouldCreateCycle(sourceId, targetId)) return false
 
     source.dependencies.add(targetId);
     target.dependents.add(sourceId);
+
+    this.paths.clear();
     return true;
   }
 
@@ -68,73 +77,90 @@ export class DAG<T extends Node> {
     const source = this.nodes.get(sourceId);
     const target = this.nodes.get(targetId);
 
-    if (!source || !target) return false;
-    if (!source.dependencies.has(targetId)) return false;
+    if (!source || !target || !source.dependencies.has(targetId)) return false;
 
     source.dependencies.delete(targetId);
     target.dependents.delete(sourceId);
+
+    this.paths.clear();
     return true;
   }
 
-  public topologicalOrder(): T[] {
-    const inDegree = new Map<string, number>();
-    const result: T[] = [];
-    const queue: string[] = [];
+  public order(sourceId?: string, direction: Direction = 'dependencies', topo: boolean = true): string[] {
+    const result: string[] = [];
+    const visited = new Set<string>();
+    const stack = new Set<string>();
 
-    // 初始化入度表
-    for (const [id, node] of this.nodes) {
-      inDegree.set(id, node.dependencies.size);
-    }
+    const visit = (id: string) => {
+      if (visited.has(id)) return;
+      visited.add(id);
+      stack.add(id);
 
-    // 收集所有入度为 0 的节点
-    for (const [id, degree] of inDegree.entries()) {
-      if (degree === 0) queue.push(id);
-    }
+      const node = this.getNode(id);
+      if (!node) return;
 
-    // 拓扑排序
-    while (queue.length > 0) {
-      const id = queue.shift()!;
-      const node = this.nodes.get(id)!;
-      result.push(node);
+      const edges = direction === 'dependencies' ? node.dependencies : node.dependents;
+      for (const nextId of edges) {
+        if (!stack.has(nextId)) visit(nextId);
+      }
 
-      for (const dependentId of node.dependents) {
-        const count = inDegree.get(dependentId)! - 1;
-        inDegree.set(dependentId, count);
-        if (count === 0) queue.push(dependentId);
+      stack.delete(id);
+      result.push(id);
+    };
+
+    if (sourceId) {
+      visit(sourceId);
+    } else {
+      for (const id of this.nodes.keys()) {
+        visit(id);
       }
     }
 
-    // 检查是否存在环（即结果长度不等于节点数）
-    if (result.length !== this.size) {
-      throw new Error("Graph contains a cycle");
-    }
+    return topo ? result.reverse() : result;
+  }
 
-    return result;
+  protected hasPath(sourceId: string, targetId: string): boolean {
+    return this.getPaths(sourceId).has(targetId);
+  }
+
+  protected getPaths(sourceId: string): Set<string> {
+    if (this.paths.has(sourceId)) return this.paths.get(sourceId)!;
+
+    const visited = new Set<string>();
+    this.forEach(sourceId, i => { visited.add(i) });
+
+    this.paths.set(sourceId, visited);
+    return visited;
+  }
+
+  protected forEach(sourceId: string, callback: (id: string) => boolean | void): void {
+    this.dfs(sourceId, new Set(), new Set(), callback);
   }
 
   private wouldCreateCycle(sourceId: string, targetId: string): boolean {
     return this.hasPath(targetId, sourceId);
   }
 
-  private hasPath(sourceId: string, targetId: string): boolean {
-    if (sourceId === targetId) return true;
+  private dfs(
+    id: string,
+    visited: Set<string>,
+    stack: Set<string>,
+    callback: (id: string) => boolean | void
+  ): boolean {
+    if (visited.has(id)) return;
+    visited.add(id);
+    stack.add(id);
 
-    const visited = new Set<string>();
-    const stack: string[] = [sourceId];
-
-    while (stack.length) {
-      const id = stack.pop()!;
-      if (id === targetId) return true;
-      if (visited.has(id)) continue;
-      visited.add(id);
-
-      const node = this.getNode(id);
-      if (!node || node.dependencies.size === 0) continue;
-
-      for (const depId of node.dependencies) {
-        if (!visited.has(depId)) stack.push(depId);
+    const node = this.getNode(id);
+    if (node) {
+      for (const dep of node.dependencies) {
+        if (stack.has(dep)) return true;
+        if (this.dfs(dep, visited, stack, callback)) return true;
       }
     }
+
+    callback(id);
+    stack.delete(id);
     return false;
   }
 }
@@ -150,35 +176,63 @@ export class StatefulNode<T = any> extends Node {
     super(id)
   }
 
-  public onLoad(data: Record<string, T>) { }
+  public onLoad(data: Record<string, T>, node: Node) { }
 
-  public onSuccess() { }
+  public onSuccess(data: Record<string, T>, node: Node) { }
 
-  public onFailed() { }
+  public onFailed(error: Error, data: Record<string, T>, node: Node) { }
 
-  public onFinished() { }
+  public onFinished(data: Record<string, T>, node: Node) { }
+
+  public onReset(node: Node): void { }
 }
 
 export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T> {
-  public async run(id: string): Promise<void> {
+  private version: number = 0;
+
+  public async run(id: string, version: number = this.version, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return;
+
     const node = this.tryActive(id);
-    if (node === false) return
+    if (node === false || version !== this.version) return;
+
+    const depsData = this.getDependencyData(id);
 
     try {
-      const depsData = this.getDependencyData(id);
-      await Promise.resolve(node.onLoad(depsData));
+      await Promise.resolve(node.onLoad(depsData, node));
+      if (version !== this.version || signal?.aborted) return;
+
       node.status = Status.Success;
-      node.onSuccess();
-    } catch (err) {
+      node.onSuccess(depsData, node);
+    } catch (error) {
+      if (version !== this.version || signal?.aborted) return;
+
       node.status = Status.Failed;
-      node.onFailed();
+      node.onFailed(error, depsData, node);
     } finally {
-      node.onFinished();
+      if (version !== this.version || signal?.aborted) return;
+
+      node.onFinished(depsData, node);
     }
 
     for (const dependentId of node.dependents) {
-      this.run(dependentId);
+      await this.run(dependentId, version, signal);
     }
+  }
+
+  public async restart(id: string, signal?: AbortSignal) {
+    this.version++;
+
+    const affected = this.order(id, 'dependents');
+    for (const nodeId of affected) {
+      const node = this.getNode(nodeId);
+      if (node) {
+        node.status = Status.Waiting;
+        node.onReset?.(node);
+      }
+    }
+
+    await this.run(id, this.version, signal);
   }
 
   private tryActive(id: string): false | T {
@@ -195,9 +249,10 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
   }
 
   private getDependencyData(id: string): Record<string, D> {
-    const node = this.getNode(id);
-    if (!node) return {};
     const data: Record<string, D> = {};
+    const node = this.getNode(id);
+    if (!node) return data;
+
     for (const depId of node.dependencies) {
       const depNode = this.getNode(depId);
       if (depNode && depNode.status === Status.Success && depNode.data !== undefined) {
