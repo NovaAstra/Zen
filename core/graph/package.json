@@ -4,5 +4,20 @@
   "type": "module",
   "private": true,
   "sideEffects": false,
-  "main": "src/index.ts"
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/es/index.js",
+      "require": "./dist/umd/index.js",
+      "types": "./dist/types/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  }
 }

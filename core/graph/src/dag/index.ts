@@ -29,7 +29,7 @@ export class DAG<T extends Node> {
     };
   }
 
-  public getNode(id: string): T {
+  public getNode(id: string): T | undefined {
     return this.nodes.get(id);
   }
 
@@ -147,7 +147,7 @@ export class DAG<T extends Node> {
     stack: Set<string>,
     callback: (id: string) => boolean | void
   ): boolean {
-    if (visited.has(id)) return;
+    if (visited.has(id)) return false;
     visited.add(id);
     stack.add(id);
 
@@ -214,7 +214,7 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
       if (version !== this.version || signal?.aborted) return;
 
       node.status = Status.Failed;
-      node.onFailed(error, depsData, node);
+      node.onFailed(error as Error, depsData, node);
     } finally {
       if (version !== this.version || signal?.aborted) return;
 

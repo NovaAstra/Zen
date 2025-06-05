@@ -1,3 +1,6 @@
 packages:
   - ui/**
   - core/**
+  - demo/**
+ignoredBuiltDependencies:
+  - core-js
