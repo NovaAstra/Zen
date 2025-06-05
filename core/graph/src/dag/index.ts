@@ -190,9 +190,15 @@ export class StatefulNode<T = any> extends Node {
 export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T> {
   private version: number = 0;
 
+  private paused: boolean = false;
+
+  private resumeResolvers: (() => void)[] = [];
+
   public async run(id: string, version: number = this.version, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) return;
+    await this.waitResumeResolvers();
 
+    if (signal?.aborted) return;
     const node = this.tryActive(id);
     if (node === false || version !== this.version) return;
 
@@ -233,6 +239,24 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
     }
 
     await this.run(id, this.version, signal);
+  }
+
+  public pause(): void {
+    this.paused = true;
+  }
+
+  public resume() {
+    if (!this.paused) return;
+    this.paused = false;
+    for (const resolve of this.resumeResolvers) resolve();
+    this.resumeResolvers.length = 0;
+  }
+
+  private async waitResumeResolvers(): Promise<void> {
+    if (!this.paused) return;
+    return new Promise<void>((resolve) => {
+      this.resumeResolvers.push(resolve);
+    });
   }
 
   private tryActive(id: string): false | T {
