@@ -1,10 +1,3 @@
-export enum Status {
-  Waiting,
-  Running,
-  Success,
-  Failed
-}
-
 export type Direction = 'dependencies' | 'dependents'
 
 export class Node {
@@ -233,6 +226,13 @@ export class DAG<T extends Node> {
       this.paths.delete(key);
     }
   }
+}
+
+export enum Status {
+  Waiting,
+  Running,
+  Success,
+  Failed
 }
 
 export class StatefulNode<T = any> extends Node {
