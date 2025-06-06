@@ -13,24 +13,24 @@
         stroke-width="2"
       />
       <!-- 节点 -->
-      <ZCircle
-        v-for="(node, index) in nodes"
-        :key="'node-' + index"
-        :node="node"
-      />
+      <template v-for="(node, index) in nodes">
+        <g :key="index">
+          <ZCircle :node="node" />
+          <text
+            :x="node.x"
+            :y="node.y + 5"
+            text-anchor="middle"
+            pointer-events="none"
+            fill="#333"
+            font-size="12"
+            font-family="Arial"
+          >
+            {{ node.label }}
+          </text>
+        </g>
+      </template>
+
       <!-- 标签 -->
-      <text
-        v-for="(node, index) in nodes"
-        :key="'text-' + index"
-        :x="node.x"
-        :y="node.y + 5"
-        text-anchor="middle"
-        fill="#333"
-        font-size="12"
-        font-family="Arial"
-      >
-        {{ node.label }}
-      </text>
     </svg>
 
     <div style="margin-top: 10px">
@@ -105,7 +105,6 @@ export default {
       const to = this.nodes[edge.to].label;
       this.dag.link(to, from);
     }
-
   },
   methods: {
     runFrom(label) {
@@ -113,11 +112,9 @@ export default {
     },
     pauseDag() {
       this.dag.pause();
-      console.log("[PAUSE]");
     },
     resumeDag() {
       this.dag.resume();
-      console.log("[RESUME]");
     },
   },
 };

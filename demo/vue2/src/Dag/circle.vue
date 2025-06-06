@@ -6,7 +6,8 @@
     :fill="fillColor"
     stroke="steelblue"
     stroke-width="2"
-    @click.prevent="handleClick"
+    @click.capture="handleClick"
+    style="cursor: pointer; pointer-events: all"
   />
 </template>
 
@@ -66,11 +67,7 @@ export default {
   },
   methods: {
     handleClick() {
-      const stateNode = this.node;
-      console.log(stateNode);
-      if (stateNode) {
-        this.root.dag.restart(stateNode.label);
-      }
+      this.root.dag.restart(this.node.label);
     },
   },
 };
