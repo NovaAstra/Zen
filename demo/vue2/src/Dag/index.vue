@@ -42,7 +42,7 @@
 </template>
 
 <script>
-import { StatefulDAG } from "@zen-core/graph";
+import { Scheduler } from "@zen-core/graph";
 import ZCircle from "./circle.vue";
 
 export default {
@@ -62,41 +62,52 @@ export default {
       type: Array,
       default: () => [
         { x: 100, y: 100, label: "A" },
-        { x: 250, y: 80, label: "B" },
-        { x: 400, y: 120, label: "C" },
-        { x: 550, y: 90, label: "D" },
-        { x: 150, y: 250, label: "E" },
-        { x: 350, y: 220, label: "F" },
-        { x: 520, y: 270, label: "G" },
-        { x: 670, y: 240, label: "H" },
-        { x: 300, y: 400, label: "I" },
-        { x: 450, y: 390, label: "J" },
-        { x: 600, y: 420, label: "K" },
-        { x: 750, y: 380, label: "L" },
+        { x: 200, y: 50, label: "B" },
+        { x: 300, y: 30, label: "C" },
+
+        { x: 200, y: 150, label: "D" },
+        { x: 300, y: 130, label: "E" },
+        { x: 400, y: 100, label: "F" },
+
+        { x: 300, y: 230, label: "G" },
+        { x: 400, y: 250, label: "H" },
+        { x: 500, y: 270, label: "I" },
+
+        { x: 600, y: 300, label: "J" },
+        { x: 700, y: 330, label: "K" },
+
+        { x: 300, y: 400, label: "X" },
+        { x: 400, y: 430, label: "Y" },
+        { x: 500, y: 460, label: "Z" },
       ],
     },
     edges: {
       type: Array,
       default: () => [
-        { from: 0, to: 1 },
-        { from: 1, to: 2 },
-        { from: 2, to: 3 },
-        { from: 0, to: 4 },
-        { from: 4, to: 5 },
-        { from: 5, to: 6 },
-        { from: 5, to: 7 }, // 分岔：F -> G 和 F -> H
-        { from: 6, to: 9 },
-        { from: 7, to: 10 },
-        { from: 9, to: 11 },
-        { from: 10, to: 11 }, // 汇合：J 和 K 都指向 L
-        { from: 4, to: 8 },
-        { from: 8, to: 9 },
+        { from: 0, to: 1 }, // A → B
+        { from: 1, to: 2 }, // B → C
+
+        { from: 0, to: 3 }, // A → D
+        { from: 3, to: 4 }, // D → E
+        { from: 4, to: 5 }, // E → F
+
+        { from: 3, to: 6 }, // D → G
+        { from: 6, to: 7 }, // G → H
+        { from: 7, to: 8 }, // H → I
+
+        { from: 5, to: 9 }, // F → J
+        { from: 8, to: 9 }, // I → J
+        { from: 9, to: 10 }, // J → K
+
+        { from: 0, to: 11 }, // A → X
+        { from: 11, to: 12 }, // X → Y
+        { from: 12, to: 13 }, // Y → Z
       ],
     },
   },
   data() {
     return {
-      dag: new StatefulDAG(),
+      dag: new Scheduler({ maxConcurrency: 2, useIdle: true }),
     };
   },
   mounted() {

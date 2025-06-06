@@ -48,7 +48,8 @@ export default {
     this.node._state = stateNode;
 
     stateNode.onLoad = async (deps, node) => {
-      await new Promise((r) => setTimeout(r, 2000));
+      const a = await new Promise((r) => setTimeout(() => r(1231), 1000));
+      stateNode.data = a;
     };
     stateNode.onSuccess = (deps, node) => {
       this.status = node.status;

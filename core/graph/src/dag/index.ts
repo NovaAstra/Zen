@@ -257,12 +257,12 @@ export class StatefulNode<T = any> extends Node {
   public onReset(node: Node): void { }
 }
 
-export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T> {
-  private readonly nodeVersions: Map<string, number> = new Map();
+export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
+  protected readonly nodeVersions: Map<string, number> = new Map();
 
-  private paused: boolean = false;
+  protected paused: boolean = false;
 
-  private resumeResolvers: (() => void)[] = [];
+  protected resumeResolvers: (() => void)[] = [];
 
   public async run(id: string, version?: number, signal?: AbortSignal): Promise<void> {
     const nodeVersion = this.nodeVersions.get(id) ?? 0;
@@ -310,9 +310,11 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
       activeNode.onFinished?.(depsData, activeNode);
     }
 
+    const tasks: Promise<void>[] = []
     for (const dependentId of activeNode.dependents) {
-      await this.run(dependentId, this.nodeVersions.get(dependentId), signal);
+      tasks.push(this.run(dependentId, this.nodeVersions.get(dependentId), signal))
     }
+    await Promise.all(tasks);
   }
 
   public async restart(id: string, signal?: AbortSignal) {
@@ -366,14 +368,14 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
     return node.status === Status.Success || node.status === Status.Failed;
   }
 
-  private async waitResume(): Promise<void> {
+  protected async waitResume(): Promise<void> {
     if (!this.paused) return Promise.resolve();
     return new Promise<void>((resolve) => {
       this.resumeResolvers.push(resolve);
     });
   }
 
-  private tryActive(id: string): false | T {
+  protected tryActive(id: string): false | T {
     const node = this.get(id);
 
     if (!node || node.status !== Status.Waiting) return false;
@@ -387,22 +389,29 @@ export class StatefulDAG<D extends any, T extends StatefulNode<D>> extends DAG<T
     return node;
   }
 
-  private getDependencyData(id: string): Record<string, D> {
+  protected getDependencyData(id: string): Record<string, D> {
     const data: Record<string, D> = {};
-    const node = this.get(id);
-    if (!node) return data;
+    const deps = this.getPaths(id, 'dependencies');
 
-    for (const depId of node.dependencies) {
-      const depNode = this.get(depId);
-      if (depNode && depNode.status === Status.Success && depNode.data !== undefined) {
-        data[depId] = depNode.data;
+    for (const depId of deps) {
+      const node = this.get(depId);
+      if (node?.status === Status.Success && node.data !== undefined) {
+        data[depId] = node.data;
       }
     }
+
     return data;
   }
 
-  private shouldAbort(id: string, version: number, signal?: AbortSignal): boolean {
+  protected shouldAbort(id: string, version: number, signal?: AbortSignal): boolean {
     const currentVersion = this.nodeVersions.get(id) ?? 0;
     return version !== currentVersion || !!signal?.aborted;
+  }
+}
+
+
+export class Scheduler<D, T extends StatefulNode<D>> extends StatefulDAG<D, T> {
+  constructor() {
+    super();
   }
 }
