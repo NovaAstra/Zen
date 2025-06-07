@@ -235,8 +235,10 @@ export enum Status {
   Failed
 }
 
-export class StatefulNode<T = any> extends Node {
+export class StatefulNode<T> extends Node {
   public status: Status = Status.Waiting;
+
+  public shallow: boolean = false;
 
   public constructor(
     public readonly id: string,
@@ -275,16 +277,18 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
     const node = this.get(id);
     if (!node) return;
 
-    for (const depId of node.dependencies) {
-      const depNode = this.get(depId);
-      if (!depNode) return;
+    if (!node.shallow) {
+      for (const depId of node.dependencies) {
+        const depNode = this.get(depId);
+        if (!depNode) return;
 
-      if (depNode.status !== Status.Success) {
-        await this.run(depId, this.nodeVersions.get(depId), signal);
-        if (this.shouldAbort(id, version, signal)) return;
+        if (depNode.status !== Status.Success) {
+          await this.run(depId, this.nodeVersions.get(depId), signal);
+          if (this.shouldAbort(id, version, signal)) return;
 
-        const depNodeAfterRun = this.get(depId);
-        if (!depNodeAfterRun || depNodeAfterRun.status !== Status.Success) return;
+          const depNodeAfterRun = this.get(depId);
+          if (!depNodeAfterRun || depNodeAfterRun.status !== Status.Success) return;
+        }
       }
     }
 
@@ -406,12 +410,5 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
   protected shouldAbort(id: string, version: number, signal?: AbortSignal): boolean {
     const currentVersion = this.nodeVersions.get(id) ?? 0;
     return version !== currentVersion || !!signal?.aborted;
-  }
-}
-
-
-export class Scheduler<D, T extends StatefulNode<D>> extends StatefulDAG<D, T> {
-  constructor() {
-    super();
   }
 }

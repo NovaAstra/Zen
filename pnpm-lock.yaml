@@ -18,11 +18,7 @@ importers:
         specifier: ^3.1.4
         version: 3.1.4(@types/node@22.15.29)(terser@5.40.0)
 
-  core/graph:
-    devDependencies:
-      vite:
-        specifier: ^6.3.5
-        version: 6.3.5(@types/node@22.15.29)(terser@5.40.0)
+  core/graph: {}
 
   core/heap: {}
 
@@ -67,6 +63,12 @@ importers:
       '@zen-core/graph':
         specifier: workspace:*
         version: link:../../core/graph
+      '@zen-core/queue':
+        specifier: workspace:*
+        version: link:../../core/queue
+      vite:
+        specifier: ^6.3.5
+        version: 6.3.5(@types/node@22.15.29)(terser@5.40.0)
 
   ui/react: {}
 

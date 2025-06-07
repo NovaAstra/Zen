@@ -1,1 +1,0 @@
-export const RequiresPaymentCode = [522, 518, 519, 419, 420, 421, 422, 423, 424]

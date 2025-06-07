@@ -1,3 +1,5 @@
+import { StatefulDAG, StatefulNode } from "@zen-core/graph"
+
 export interface Options {
   intersectionObserverInit: IntersectionObserverInit;
 }
@@ -30,37 +32,13 @@ export class Scroll {
 
 }
 
-export class Scheduler {
-  private running: boolean = false;
-
-  private idleCallbackId: number;
-
-  public launch() {
-
-  }
-
-  public schedule() {
-    if (this.idleCallbackId) cancelIdleCallback(this.idleCallbackId);
-
-    this.idleCallbackId = requestIdleCallback((deadline: IdleDeadline) => {
-      this.handle(deadline);
-    })
-  }
-
-  public terminate() {
-    if (this.idleCallbackId) {
-      cancelIdleCallback(this.idleCallbackId);
-      this.idleCallbackId = undefined;
-    }
-    this.running = false;
-  }
-
-  private handle(deadline: IdleDeadline) {
-    this.running = true;
+export class Scheduler<D, T extends StatefulNode<D>> extends StatefulDAG<D, T> {
+  constructor() {
+    super();
   }
 }
 
-export class Lozad<P extends Component, T extends Metric> extends Scheduler {
+export class Lozad<P extends Component, T extends Metric> {
   public observer: IntersectionObserver;
 
   public readonly components: P[] = [];
@@ -70,7 +48,6 @@ export class Lozad<P extends Component, T extends Metric> extends Scheduler {
   private mountedElements: WeakMap<Element, T> = new WeakMap();
 
   public constructor(options: Partial<Options> = {}) {
-    super()
   }
 
   public bootstrap() {
@@ -100,8 +77,6 @@ export class Lozad<P extends Component, T extends Metric> extends Scheduler {
   }
 
   public observe(element: Element, data: T) {
-    if (!this.initialized) this.launch();
-
     this.observer.observe(element);
     this.mountedElements.set(element, { ...data, visitedCount: 0 });
   }

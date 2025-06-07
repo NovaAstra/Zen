@@ -36,7 +36,3 @@ export class PriorityQueue<T> {
     return this.heap.push(node);
   }
 }
-
-const queue = new PriorityQueue<number>(
-  (a, b) => a - b
-);
