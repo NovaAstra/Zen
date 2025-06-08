@@ -366,7 +366,7 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
     return version !== currentVersion || !!signal?.aborted;
   }
 
-  private async _run(id: string, version?: number, signal?: AbortSignal, rootId: string = id): Promise<void> {
+  protected async _run(id: string, version?: number, signal?: AbortSignal, rootId: string = id): Promise<void> {
     const nodeVersion = this.nodeVersions.get(id) ?? 0;
     if (version === undefined) version = nodeVersion;
 
@@ -439,11 +439,128 @@ export class PriorityDAG<D, T extends PriorityNode<D>> extends StatefulDAG<D, T>
 
   protected readonly queue: PriorityQueue<T> = new PriorityQueue((a, b) => b.priority - a.priority);
 
+  private readonly queuedIds: Set<string> = new Set();
+
+  private runningCount = 0;
+  private workCallTimeout: any = null;
+  private nextWorkCall = 0;
+  public readonly WORK_CALL_INTERVAL_LIMIT: number = 100;
+
   public constructor(options: Partial<PriorityDAGOptions> = {}) {
     super()
 
     this.options = Object.assign({}, PriorityDAG.options, options);
   }
 
-}
+  private enqueue(node: T) {
+    if (this.queuedIds.has(node.id)) return;
+    this.queuedIds.add(node.id);
+    this.queue.push(node);
+  }
 
+  private dequeue(): T | undefined {
+    const node = this.queue.poll();
+    if (node) this.queuedIds.delete(node.id);
+    return node;
+  }
+
+  public async run(id: string, version?: number, signal?: AbortSignal) {
+    const node = this.get(id);
+    if (!node) return;
+
+    if (this.isFinished(id)) return; // 任务已完成
+    if (!this.isReady(id)) return;   // 依赖未满足
+
+    this.enqueue(node);
+    this.scheduleWork();
+  }
+
+  private scheduleWork() {
+    if (this.workCallTimeout) return;
+
+    const now = Date.now();
+    this.nextWorkCall = Math.max(this.nextWorkCall + this.WORK_CALL_INTERVAL_LIMIT, now);
+    const delay = this.nextWorkCall - now;
+
+    this.workCallTimeout = setTimeout(() => {
+      this.workCallTimeout = null;
+      this.doWork();
+    }, delay);
+  }
+
+
+  private async doWork() {
+    while (this.runningCount < this.options.maxConcurrency && this.queue.size > 0) {
+      const node = this.dequeue();
+      if (!node) break;
+
+      if (this.isFinished(node.id)) continue;
+
+      if (!this.isReady(node.id)) {
+        // 依赖未满足，重新入队尾
+        this.enqueue(node);
+        break;
+      }
+
+      this.runningCount++;
+      this._run(node.id, this.nodeVersions.get(node.id), undefined, node.id)
+        .finally(() => {
+          this.runningCount--;
+          this.scheduleWork();
+        });
+    }
+  }
+
+  // 重写 _run，去除递归，依赖由调度器负责执行
+  protected override async _run(id: string, version?: number, signal?: AbortSignal, rootId: string = id): Promise<void> {
+    const nodeVersion = this.nodeVersions.get(id) ?? 0;
+    if (version === undefined) version = nodeVersion;
+
+    if (this.shouldAbort(id, version, signal)) return;
+    await this.waitResume();
+    if (this.shouldAbort(id, version, signal)) return;
+
+    const node = this.get(id);
+    if (!node) return;
+
+    // 依赖不满足，放弃执行，调度器会处理
+    for (const depId of node.dependencies) {
+      const depNode = this.get(depId);
+      if (!depNode || depNode.status !== Status.Success) {
+        return;
+      }
+    }
+
+    const activeNode = this.tryActive(id);
+    if (activeNode === false) return;
+
+    const depsData = this.getDependencyData(id);
+
+    try {
+      await Promise.resolve(activeNode.onLoad?.(depsData, activeNode));
+      if (this.shouldAbort(id, version, signal)) return;
+
+      activeNode.status = Status.Success;
+      activeNode.onSuccess?.(depsData, activeNode);
+    } catch (error) {
+      if (this.shouldAbort(id, version, signal)) return;
+
+      activeNode.status = Status.Failed;
+      activeNode.onFailed?.(error as Error, depsData, activeNode);
+    } finally {
+      if (this.shouldAbort(id, version, signal)) return;
+
+      activeNode.onFinished?.(depsData, activeNode);
+    }
+
+    // 执行完后，将所有依赖当前节点的节点入队，等待调度
+    for (const dependentId of activeNode.dependents) {
+      const dependentNode = this.get(dependentId);
+      if (!dependentNode) continue;
+
+      if (!this.queuedIds.has(dependentId) && !this.isFinished(dependentId)) {
+        this.enqueue(dependentNode);
+      }
+    }
+  }
+}
