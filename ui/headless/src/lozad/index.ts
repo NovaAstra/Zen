@@ -1,4 +1,9 @@
-import { StatefulDAG, StatefulNode } from "@zen-core/graph"
+import { StatefulDAG, StatefulNode, Status, Direction } from "@zen-core/graph"
+import { PriorityQueue } from "@zen-core/queue"
+
+export {
+  StatefulDAG, StatefulNode, Status
+}
 
 export interface Options {
   intersectionObserverInit: IntersectionObserverInit;
@@ -28,8 +33,31 @@ export class Memory {
   public constructor(public readonly lozad: Lozad<Component, Metric>) { }
 }
 
-export class Scroll {
+export class Scroll<D, T extends StatefulNode<D>> {
+  public scrolling: boolean = false;
 
+  public version: number = 0;
+
+  public constructor(
+    public readonly dag: StatefulDAG<D, T>,
+    public readonly queue: PriorityQueue<T>,
+  ) { }
+
+  public onScroll() { }
+
+  public onScrollStart() {
+    this.scrolling = true;
+
+    this.dag.pause();
+    this.queue.clear();
+    this.version++;
+  }
+
+  public onScrollEnd() {
+    this.scrolling = false;
+
+    this.dag.resume();
+  }
 }
 
 export class Scheduler<D, T extends StatefulNode<D>> extends StatefulDAG<D, T> {
@@ -38,14 +66,16 @@ export class Scheduler<D, T extends StatefulNode<D>> extends StatefulDAG<D, T> {
   }
 }
 
+
 export class Lozad<P extends Component, T extends Metric> {
-  public observer: IntersectionObserver;
+  public observer!: IntersectionObserver;
 
   public readonly components: P[] = [];
 
   private initialized: boolean = false;
 
   private mountedElements: WeakMap<Element, T> = new WeakMap();
+
 
   public constructor(options: Partial<Options> = {}) {
   }
@@ -58,18 +88,6 @@ export class Lozad<P extends Component, T extends Metric> {
 
       for (const { target, isIntersecting } of entries) {
         if (!this.mountedElements.has(target)) continue;
-
-        const metric = this.mountedElements.get(target);
-        if (isIntersecting) {
-          metric.lastVisited = now;
-          metric.visitedCount += 1;
-          metric.status = Visibility.Visible;
-          this.mountedElements.set(target, metric);
-          continue;
-        }
-
-        metric.status = Visibility.Hidden;
-        this.mountedElements.set(target, metric);
       }
     });
 

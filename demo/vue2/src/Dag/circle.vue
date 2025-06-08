@@ -1,18 +1,10 @@
 <template>
-  <circle
-    :cx="node.x"
-    :cy="node.y"
-    :r="15"
-    :fill="fillColor"
-    stroke="steelblue"
-    stroke-width="2"
-    @click.capture="handleClick"
-    style="cursor: pointer; pointer-events: all"
-  />
+  <circle :cx="node.x" :cy="node.y" :r="15" :fill="fillColor" stroke="steelblue" stroke-width="2"
+    @click.capture="handleClick" style="cursor: pointer; pointer-events: all" />
 </template>
 
 <script>
-import { Status, StatefulNode } from "@zen-core/graph";
+import { Status, StatefulNode } from "@zen-ui/headless";
 
 export default {
   inject: ["root"],
@@ -44,6 +36,10 @@ export default {
   },
   created() {
     const stateNode = new StatefulNode(this.node.label, this.node.label, null);
+
+    if (this.node.label === 'E1') {
+      stateNode.priority = 100
+    }
 
     this.node._state = stateNode;
 

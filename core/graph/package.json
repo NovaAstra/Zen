@@ -4,5 +4,8 @@
   "type": "module",
   "private": true,
   "sideEffects": false,
-  "main": "src/index.ts"
+  "main": "src/index.ts",
+  "dependencies": {
+    "@zen-core/queue": "workspace:*"
+  }
 }

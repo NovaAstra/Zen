@@ -1,3 +1,5 @@
+import { PriorityQueue } from "@zen-core/queue";
+
 export type Direction = 'dependencies' | 'dependents'
 
 export class Node {
@@ -186,11 +188,11 @@ export class DAG<T extends Node> {
     this.traverse(sourceId, callback)
   }
 
-  private cycle(sourceId: string, targetId: string): boolean {
+  protected cycle(sourceId: string, targetId: string): boolean {
     return this.hasPath(targetId, sourceId);
   }
 
-  private traverse(sourceId: string, callback: (id: string) => boolean | void, direction: Direction = 'dependencies'): void {
+  protected traverse(sourceId: string, callback: (id: string) => boolean | void, direction: Direction = 'dependencies'): void {
     const visited = new Set<string>()
     const stack = [sourceId]
 
@@ -214,7 +216,7 @@ export class DAG<T extends Node> {
     }
   }
 
-  private evict(id: string): void {
+  protected evict(id: string): void {
     const toDelete: string[] = [];
     for (const [key, reachable] of this.paths.entries()) {
       const [, source] = key.split(':');
@@ -238,8 +240,6 @@ export enum Status {
 export class StatefulNode<T> extends Node {
   public status: Status = Status.Waiting;
 
-  public shallow: boolean = false;
-
   public constructor(
     public readonly id: string,
     public name?: string,
@@ -248,7 +248,8 @@ export class StatefulNode<T> extends Node {
     super(id)
   }
 
-  public onLoad(data: Record<string, T>, node: Node) { }
+  public onLoad(data: Record<string, T>, node: Node) {
+  }
 
   public onSuccess(data: Record<string, T>, node: Node) { }
 
@@ -266,91 +267,44 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
 
   protected resumeResolvers: (() => void)[] = [];
 
-  public async run(id: string, version?: number, signal?: AbortSignal): Promise<void> {
-    const nodeVersion = this.nodeVersions.get(id) ?? 0;
-    if (version === undefined) version = nodeVersion;
-
-    if (this.shouldAbort(id, version, signal)) return;
-    await this.waitResume();
-    if (this.shouldAbort(id, version, signal)) return;
-
-    const node = this.get(id);
-    if (!node) return;
-
-    if (!node.shallow) {
-      for (const depId of node.dependencies) {
-        const depNode = this.get(depId);
-        if (!depNode) return;
-
-        if (depNode.status !== Status.Success) {
-          await this.run(depId, this.nodeVersions.get(depId), signal);
-          if (this.shouldAbort(id, version, signal)) return;
-
-          const depNodeAfterRun = this.get(depId);
-          if (!depNodeAfterRun || depNodeAfterRun.status !== Status.Success) return;
-        }
-      }
+  public async run(id: string, version?: number, signal?: AbortSignal, rootId?: string): Promise<void> {
+    if (this.pause) {
+      this.resume(true)
     }
 
-    const activeNode = this.tryActive(id);
-    if (activeNode === false) return;
-
-    const depsData = this.getDependencyData(id);
-
-    try {
-      await Promise.resolve(activeNode.onLoad(depsData, activeNode));
-      if (this.shouldAbort(id, version, signal)) return;
-
-      activeNode.status = Status.Success;
-      activeNode.onSuccess?.(depsData, activeNode);
-    } catch (error) {
-      if (this.shouldAbort(id, version, signal)) return;
-
-      activeNode.status = Status.Failed;
-      activeNode.onFailed?.(error as Error, depsData, activeNode);
-    } finally {
-      if (this.shouldAbort(id, version, signal)) return;
-
-      activeNode.onFinished?.(depsData, activeNode);
-    }
-
-    const tasks: Promise<void>[] = []
-    for (const dependentId of activeNode.dependents) {
-      tasks.push(this.run(dependentId, this.nodeVersions.get(dependentId), signal))
-    }
-    await Promise.all(tasks);
+    await this._run(id, version, signal, rootId ?? id)
   }
 
   public async restart(id: string, signal?: AbortSignal) {
-    const upstream = this.order(id, 'dependents');
-    upstream.push(id);
+    const chain = this.order(id, 'dependents');
+    chain.push(id);
 
-    for (const nodeId of upstream) {
-      const oldVer = this.nodeVersions.get(nodeId) ?? 0;
-      this.nodeVersions.set(nodeId, oldVer + 1);
-    }
-
-    for (const nodeId of upstream) {
+    for (const nodeId of chain) {
       const node = this.get(nodeId);
       if (node) {
+        this.nodeVersions.set(nodeId, (this.nodeVersions.get(nodeId) ?? 0) + 1);
         node.status = Status.Waiting;
         node.onReset?.(node);
       }
     }
 
-    for (const nodeId of upstream) {
-      await this.run(nodeId, this.nodeVersions.get(nodeId), signal);
+    const tasks: Promise<void>[] = []
+    for (const nodeId of chain) {
+      tasks.push(this._run(nodeId, this.nodeVersions.get(nodeId), signal))
     }
+    await Promise.all(tasks);
   }
 
   public pause(): void {
     this.paused = true;
   }
 
-  public resume() {
+  public resume(run: boolean = false) {
     if (!this.paused) return;
     this.paused = false;
-    for (const resolve of this.resumeResolvers) resolve();
+    if (!run) {
+      for (const resolve of this.resumeResolvers) resolve();
+    }
     this.resumeResolvers.length = 0;
   }
 
@@ -411,4 +365,85 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
     const currentVersion = this.nodeVersions.get(id) ?? 0;
     return version !== currentVersion || !!signal?.aborted;
   }
+
+  private async _run(id: string, version?: number, signal?: AbortSignal, rootId: string = id): Promise<void> {
+    const nodeVersion = this.nodeVersions.get(id) ?? 0;
+    if (version === undefined) version = nodeVersion;
+
+    if (this.shouldAbort(id, version, signal)) return;
+    await this.waitResume();
+    if (this.shouldAbort(id, version, signal)) return;
+
+    const node = this.get(id);
+    if (!node) return;
+
+    for (const depId of node.dependencies) {
+      const depNode = this.get(depId);
+      if (!depNode) return;
+
+      if (depNode.status !== Status.Success) {
+        await this._run(depId, this.nodeVersions.get(depId), signal, rootId);
+        if (this.shouldAbort(id, version, signal)) return;
+
+        const depNodeAfterRun = this.get(depId);
+        if (!depNodeAfterRun || depNodeAfterRun.status !== Status.Success) return;
+      }
+    }
+
+    const activeNode = this.tryActive(id);
+    if (activeNode === false) return;
+
+    const depsData = this.getDependencyData(id);
+
+    try {
+      await Promise.resolve(activeNode.onLoad(depsData, activeNode));
+      if (this.shouldAbort(id, version, signal)) return;
+
+      activeNode.status = Status.Success;
+      activeNode.onSuccess?.(depsData, activeNode);
+    } catch (error) {
+      if (this.shouldAbort(id, version, signal)) return;
+
+      activeNode.status = Status.Failed;
+      activeNode.onFailed?.(error as Error, depsData, activeNode);
+    } finally {
+      if (this.shouldAbort(id, version, signal)) return;
+
+      activeNode.onFinished?.(depsData, activeNode);
+    }
+
+    if (rootId === id) {
+      const tasks: Promise<void>[] = []
+      for (const dependentId of activeNode.dependents) {
+        tasks.push(this._run(dependentId, this.nodeVersions.get(dependentId), signal))
+      }
+      await Promise.all(tasks);
+    }
+  }
 }
+
+export interface PriorityDAGOptions {
+  maxConcurrency: number;
+}
+
+export class PriorityNode<T> extends StatefulNode<T> {
+  public priority: number = 0;
+}
+
+export class PriorityDAG<D, T extends PriorityNode<D>> extends StatefulDAG<D, T> {
+  public static options: PriorityDAGOptions = {
+    maxConcurrency: 3
+  }
+
+  private readonly options: PriorityDAGOptions
+
+  protected readonly queue: PriorityQueue<T> = new PriorityQueue((a, b) => b.priority - a.priority);
+
+  public constructor(options: Partial<PriorityDAGOptions> = {}) {
+    super()
+
+    this.options = Object.assign({}, PriorityDAG.options, options);
+  }
+
+}
+

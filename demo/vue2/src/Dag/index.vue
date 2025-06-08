@@ -5,6 +5,7 @@
       <button @click="restartFrom('A')">重置</button>
       <button @click="pauseDag">暂停</button>
       <button @click="resumeDag">恢复</button>
+      <button @click="runFrom('E1')">暂停时开始E1</button>
     </div>
 
     <svg :width="width" :height="height" style="border: 1px solid #ccc">
@@ -30,7 +31,7 @@
 </template>
 
 <script>
-import { Scheduler } from "@zen-core/graph";
+import { Scheduler } from "@zen-ui/headless";
 import ZCircle from "./circle.vue";
 
 export default {
@@ -49,7 +50,6 @@ export default {
     nodes: {
       type: Array,
       default: () => [
-        // 水平主干节点 (y=100保持不变)
         { x: 100, y: 100, label: "A" },
         { x: 300, y: 100, label: "B" },
         { x: 500, y: 100, label: "C" },
@@ -57,7 +57,6 @@ export default {
         { x: 900, y: 100, label: "E" },
         { x: 1100, y: 100, label: "F" },
 
-        // B的超级垂直分支 (15层，达到y=6000)
         { x: 300, y: 500, label: "B1" },
         { x: 300, y: 900, label: "B2" },
         { x: 300, y: 1300, label: "B3" },
@@ -74,7 +73,6 @@ export default {
         { x: 300, y: 5700, label: "B14" },
         { x: 300, y: 6100, label: "B15" },
 
-        // C的超级垂直分支 (12层，达到y=5300)
         { x: 500, y: 500, label: "C1" },
         { x: 500, y: 900, label: "C2" },
         { x: 500, y: 1300, label: "C3" },
@@ -89,7 +87,6 @@ export default {
         { x: 500, y: 4900, label: "C12" },
         { x: 500, y: 5300, label: "C13" },
 
-        // D的超级垂直分支 (18层，达到y=7300 - 最深的!)
         { x: 700, y: 500, label: "D1" },
         { x: 700, y: 900, label: "D2" },
         { x: 700, y: 1300, label: "D3" },
@@ -109,7 +106,6 @@ export default {
         { x: 700, y: 6900, label: "D17" },
         { x: 700, y: 7300, label: "D18" },
 
-        // E的超级垂直分支 (10层，达到y=4500)
         { x: 900, y: 500, label: "E1" },
         { x: 900, y: 900, label: "E2" },
         { x: 900, y: 1300, label: "E3" },
@@ -122,7 +118,6 @@ export default {
         { x: 900, y: 4100, label: "E10" },
         { x: 900, y: 4500, label: "E11" },
 
-        // F的超级垂直分支 (14层，达到y=6100)
         { x: 1100, y: 500, label: "F1" },
         { x: 1100, y: 900, label: "F2" },
         { x: 1100, y: 1300, label: "F3" },
@@ -205,8 +200,8 @@ export default {
     runFrom(label) {
       this.dag.run(label);
     },
-    restartFrom(label) {
-      this.dag.restart(label);
+    restartFrom(label, force = false) {
+      this.dag.restart(label, force);
     },
     pauseDag() {
       this.dag.pause();

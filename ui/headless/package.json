@@ -2,13 +2,13 @@
   "name": "@zen-ui/headless",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
   "sideEffects": false,
   "main": "src/index.ts",
   "exports": {
     ".": {
       "import": "./dist/es/index.js",
-      "require": "./dist/umd/index.js",
-      "types": "./dist/types/index.d.ts"
+      "require": "./dist/umd/index.js"
     }
   },
   "scripts": {

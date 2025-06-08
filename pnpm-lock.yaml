@@ -18,7 +18,11 @@ importers:
         specifier: ^3.1.4
         version: 3.1.4(@types/node@22.15.29)(terser@5.40.0)
 
-  core/graph: {}
+  core/graph:
+    dependencies:
+      '@zen-core/queue':
+        specifier: workspace:*
+        version: link:../queue
 
   core/heap: {}
 
@@ -35,6 +39,9 @@ importers:
       '@zen-core/graph':
         specifier: workspace:*
         version: link:../../core/graph
+      '@zen-ui/headless':
+        specifier: workspace:*
+        version: link:../../ui/headless
       core-js:
         specifier: ^3.8.3
         version: 3.42.0
