@@ -5,7 +5,7 @@
       <button @click="restartFrom('A')">重置</button>
       <button @click="pauseDag">暂停</button>
       <button @click="resumeDag">恢复</button>
-      <button @click="runFrom('E1')">暂停时开始E1</button>
+      <button @click="dag.boostPriority('E',60)">提升E优先级</button>
     </div>
 
     <svg :width="width" :height="height" style="border: 1px solid #ccc">

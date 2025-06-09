@@ -1,12 +1,12 @@
 import { PriorityQueue } from "@zen-core/queue";
 
 class Node {
-  priority: number = 0;
-  maxPathPriority: number = 0; // 路径最大优先级缓存
-  dependencies: Set<string> = new Set();
-  dependents: Set<string> = new Set();
+  priority = 0;
+  maxPathPriority = 0;
+  dependencies = new Set<string>();
+  dependents = new Set<string>();
 
-  constructor(public readonly id: string) { }
+  constructor(public readonly id: string) {}
 }
 
 function computeMaxPathPriority(
@@ -22,7 +22,7 @@ function computeMaxPathPriority(
   let maxPriority = node.priority;
   for (const depId of node.dependents) {
     const depPriority = computeMaxPathPriority(depId, nodeMap, memo);
-    if (depPriority > maxPriority) maxPriority = depPriority;
+    maxPriority = Math.max(maxPriority, depPriority);
   }
 
   memo.set(nodeId, maxPriority);
@@ -30,62 +30,56 @@ function computeMaxPathPriority(
   return maxPriority;
 }
 
-function getReachableNodes(startNodeId: string, nodeMap: Map<string, Node>): Set<string> {
-  const reachable = new Set<string>();
+function getDownstreamReachableNodes(startNodeId: string, nodeMap: Map<string, Node>): Set<string> {
+  const visited = new Set<string>();
   const queue = [startNodeId];
-  reachable.add(startNodeId);
+  visited.add(startNodeId);
 
   while (queue.length > 0) {
-    const currentId = queue.shift()!;
-    const node = nodeMap.get(currentId);
+    const current = queue.shift()!;
+    const node = nodeMap.get(current);
     if (!node) continue;
 
-    for (const depId of node.dependencies) {
-      if (!reachable.has(depId)) {
-        reachable.add(depId);
-        queue.push(depId);
-      }
-    }
-    for (const depId of node.dependents) {
-      if (!reachable.has(depId)) {
-        reachable.add(depId);
-        queue.push(depId);
+    for (const next of node.dependents) {
+      if (!visited.has(next)) {
+        visited.add(next);
+        queue.push(next);
       }
     }
   }
-  return reachable;
+
+  return visited;
 }
 
-function buildInDegreeMap(reachableNodes: Set<string>, nodeMap: Map<string, Node>): Map<string, number> {
-  const inDegree = new Map<string, number>();
-  for (const id of reachableNodes) {
+function buildInDegreeMap(subset: Set<string>, nodeMap: Map<string, Node>): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const id of subset) {
     const node = nodeMap.get(id);
     if (node) {
-      inDegree.set(id, node.dependencies.size);
+      let count = 0;
+      for (const dep of node.dependencies) {
+        if (subset.has(dep)) count++;
+      }
+      map.set(id, count);
     }
   }
-  return inDegree;
+  return map;
 }
 
-
 function scheduleExecution(startNodeId: string, nodeMap: Map<string, Node>): string[] {
-  const reachableNodes = getReachableNodes(startNodeId, nodeMap);
+  const reachable = getDownstreamReachableNodes(startNodeId, nodeMap);
 
-  // 先计算 maxPathPriority
   const memo = new Map<string, number>();
-  for (const id of reachableNodes) {
+  for (const id of reachable) {
     computeMaxPathPriority(id, nodeMap, memo);
   }
 
-  const inDegree = buildInDegreeMap(reachableNodes, nodeMap);
+  const inDegree = buildInDegreeMap(reachable, nodeMap);
   const result: string[] = [];
 
-  // 注意这里使用大顶堆：优先级高的先出队
-  // comparator 返回负数时 a 优先于 b
-  // 所以这里用 b.maxPathPriority - a.maxPathPriority，maxPathPriority大的先出队
   const pq = new PriorityQueue<Node>((a, b) => b.maxPathPriority - a.maxPathPriority);
 
-  for (const id of reachableNodes) {
+  for (const id of reachable) {
     if (inDegree.get(id) === 0) {
       const node = nodeMap.get(id);
       if (node) pq.push(node);
@@ -97,7 +91,8 @@ function scheduleExecution(startNodeId: string, nodeMap: Map<string, Node>): str
     result.push(node.id);
 
     for (const dependentId of node.dependents) {
-      if (!inDegree.has(dependentId)) continue;
+      if (!reachable.has(dependentId)) continue;
+
       const count = inDegree.get(dependentId)! - 1;
       inDegree.set(dependentId, count);
       if (count === 0) {
@@ -142,5 +137,5 @@ function addDependency(from: string, to: string) {
 ].forEach(([from, to]) => addDependency(from, to));
 
 // ---------- 执行调度 ----------
-const result = scheduleExecution("Root", nodeMap);
+const result = scheduleExecution("G", nodeMap);
 console.log("执行顺序:", result);

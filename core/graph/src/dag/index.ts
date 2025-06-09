@@ -491,6 +491,8 @@ const cancelIdle = (id: number): void => {
 
 export class PriorityNode<T> extends StatefulNode<T> {
   public priority: number = 0;
+
+  public _priority: number = this.priority;
   public _version?: number;
   public _signal?: AbortSignal;
 }
@@ -501,15 +503,191 @@ const DEFAULT_OPTIONS: PriorityDAGOptions = {
 };
 
 export class PriorityDAG<D, T extends PriorityNode<D>> extends StatefulDAG<D, T> {
-  private readonly options: PriorityDAGOptions;
+  private lastExecutedNodeId: string | null = null;
+  private levels: Map<string, number> = new Map();
+  private reachable: Set<string> = new Set();
+  private inDegree: Map<string, number> = new Map();
 
-  protected readonly queue: PriorityQueue<T> = new PriorityQueue(
-    (a, b) => b.priority - a.priority,
-    false
-  );
+  private pq: PriorityQueue<T>;
 
-  public constructor(options: Partial<PriorityDAGOptions> = {}) {
+  constructor() {
     super();
-    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
+    this.pq = new PriorityQueue<T>((a, b) => this.compareNodes(a, b));
+  }
+
+  private compareNodes(a: T, b: T): number {
+    const diff = (b._priority ?? 0) - (a._priority ?? 0);
+    if (diff !== 0) return diff;
+
+    if (this.lastExecutedNodeId) {
+      const lastNode = this.get(this.lastExecutedNodeId);
+      const lastDependents = lastNode?.dependents;
+
+      const aIsDependent = lastDependents?.has(a.id) ?? false;
+      const bIsDependent = lastDependents?.has(b.id) ?? false;
+
+      if (aIsDependent && !bIsDependent) return -1;
+      if (bIsDependent && !aIsDependent) return 1;
+    }
+
+    return (this.levels.get(a.id) ?? Infinity) - (this.levels.get(b.id) ?? Infinity);
+  }
+
+  private computeMaxPathPriority(nodeId: string, memo = new Map<string, number>()): number {
+    if (memo.has(nodeId)) return memo.get(nodeId)!;
+
+    const node = this.get(nodeId);
+    if (!node) return 0;
+
+    let maxPriority = node.priority;
+    for (const depId of node.dependents) {
+      maxPriority = Math.max(maxPriority, this.computeMaxPathPriority(depId, memo));
+    }
+
+    memo.set(nodeId, maxPriority);
+    node._priority = maxPriority;
+    return maxPriority;
+  }
+
+  private getDownstreamReachableNodes(startNodeId: string): Set<string> {
+    const visited = new Set<string>();
+    const queue = [startNodeId];
+    visited.add(startNodeId);
+
+    while (queue.length) {
+      const current = queue.shift()!;
+      const node = this.get(current);
+      if (!node) continue;
+
+      for (const next of node.dependents) {
+        if (!visited.has(next)) {
+          visited.add(next);
+          queue.push(next);
+        }
+      }
+    }
+    return visited;
+  }
+
+  private buildInDegreeMap(subset: Set<string>): Map<string, number> {
+    const inDegree = new Map<string, number>();
+    for (const id of subset) {
+      const node = this.get(id);
+      if (!node) continue;
+
+      let count = 0;
+      for (const depId of node.dependencies) {
+        if (subset.has(depId)) count++;
+      }
+      inDegree.set(id, count);
+    }
+    return inDegree;
+  }
+
+  private computeLevels(startNodeId: string, reachable: Set<string>): Map<string, number> {
+    const levels = new Map<string, number>();
+    levels.set(startNodeId, 0);
+    const queue = [startNodeId];
+
+    while (queue.length) {
+      const current = queue.shift()!;
+      const currentLevel = levels.get(current)!;
+      const node = this.get(current);
+      if (!node) continue;
+
+      for (const depId of node.dependents) {
+        if (!reachable.has(depId)) continue;
+        const existingLevel = levels.get(depId);
+        if (existingLevel === undefined || existingLevel > currentLevel + 1) {
+          levels.set(depId, currentLevel + 1);
+          queue.push(depId);
+        }
+      }
+    }
+    return levels;
+  }
+
+  // 动态提升某个节点及其路径优先级
+public boostPriority(nodeId: string, delta: number): void {
+  const node = this.get(nodeId);
+  if (!node || !this.reachable.has(nodeId)) return;
+
+  node.priority += delta;
+
+  const memo = new Map<string, number>();
+  // 只对当前reachable子图重新计算 max path priority
+  for (const id of this.reachable) {
+    this.computeMaxPathPriority(id, memo);
+  }
+
+  // 重建优先队列中的元素顺序（不移除并重插入会导致堆结构失效）
+  const nodes: T[] = [];
+  while (this.pq.size > 0) {
+    nodes.push(this.pq.poll()!);
+  }
+  for (const n of nodes) {
+    this.pq.push(n);
+  }
+}
+
+
+  public async run(startNodeId: string, version?: number, signal?: AbortSignal): Promise<void> {
+    if (!this.has(startNodeId)) throw new Error(`Node ${startNodeId} not found`);
+
+    this.reachable = this.getDownstreamReachableNodes(startNodeId);
+    const memo = new Map<string, number>();
+    for (const id of this.reachable) this.computeMaxPathPriority(id, memo);
+    this.inDegree = this.buildInDegreeMap(this.reachable);
+    this.levels = this.computeLevels(startNodeId, this.reachable);
+    this.lastExecutedNodeId = null;
+
+    this.pq.clear();
+
+    for (const id of this.reachable) {
+      if (this.inDegree.get(id) === 0) {
+        const node = this.get(id)!;
+        if (node.status === Status.Waiting) this.pq.push(node);
+      }
+    }
+
+    while (this.pq.size > 0) {
+      await this.waitResume();
+      if (signal?.aborted) return;
+
+      const node = this.pq.poll()!;
+      this.lastExecutedNodeId = node.id;
+
+      const ver = this.nodeVersions.get(node.id) ?? 0;
+      if (this.shouldAbort(node.id, ver, signal)) continue;
+      if (!this.isReady(node.id)) continue;
+
+      node.status = Status.Running;
+      try {
+        const depData = this.getDependencyData(node.id);
+        await Promise.resolve(node.onLoad(depData, node));
+        if (this.shouldAbort(node.id, ver, signal)) continue;
+        node.status = Status.Success;
+        node.onSuccess?.(depData, node);
+      } catch (err) {
+        node.status = Status.Failed;
+        node.onFailed?.(err as Error, this.getDependencyData(node.id), node);
+      } finally {
+        node.onFinished?.(this.getDependencyData(node.id), node);
+      }
+
+      if (signal?.aborted) return;
+
+      for (const dependentId of node.dependents) {
+        if (!this.reachable.has(dependentId)) continue;
+        const cnt = this.inDegree.get(dependentId)! - 1;
+        this.inDegree.set(dependentId, cnt);
+        if (cnt === 0) {
+          const depNode = this.get(dependentId)!;
+          if (depNode.status === Status.Waiting) {
+            this.pq.push(depNode);
+          }
+        }
+      }
+    }
   }
 }

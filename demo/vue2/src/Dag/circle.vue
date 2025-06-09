@@ -37,8 +37,11 @@ export default {
   created() {
     const stateNode = new PriorityNode(this.node.label, this.node.label, null);
 
-    if (this.node.label === 'T' || this.node.label === 'H' ||this.node.label === 'X') {
+    if (this.node.label === 'H' ||this.node.label === 'X') {
       stateNode.priority = 100
+    }
+    if (this.node.label === 'T') {
+      stateNode.priority = 90
     }
 
     this.node._state = stateNode;
