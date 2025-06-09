@@ -1,8 +1,8 @@
-import { StatefulDAG, StatefulNode, Status, Direction } from "@zen-core/graph"
+import { PriorityDAG, PriorityNode, Status, Direction } from "@zen-core/graph"
 import { PriorityQueue } from "@zen-core/queue"
 
 export {
-  StatefulDAG, StatefulNode, Status
+  PriorityDAG, PriorityNode, Status
 }
 
 export interface Options {
@@ -33,13 +33,13 @@ export class Memory {
   public constructor(public readonly lozad: Lozad<Component, Metric>) { }
 }
 
-export class Scroll<D, T extends StatefulNode<D>> {
+export class Scroll<D, T extends PriorityNode<D>> {
   public scrolling: boolean = false;
 
   public version: number = 0;
 
   public constructor(
-    public readonly dag: StatefulDAG<D, T>,
+    public readonly dag: PriorityDAG<D, T>,
     public readonly queue: PriorityQueue<T>,
   ) { }
 
@@ -60,7 +60,7 @@ export class Scroll<D, T extends StatefulNode<D>> {
   }
 }
 
-export class Scheduler<D, T extends StatefulNode<D>> extends StatefulDAG<D, T> {
+export class Scheduler<D, T extends PriorityNode<D>> extends PriorityDAG<D, T> {
   constructor() {
     super();
   }

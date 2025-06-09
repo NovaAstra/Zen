@@ -10,8 +10,8 @@ export class Node {
 }
 
 export class DAG<T extends Node> {
-  private readonly nodes: Map<string, T> = new Map();
-  private readonly paths: Map<string, Set<string>> = new Map();
+  public readonly nodes: Map<string, T> = new Map();
+  public readonly paths: Map<string, Set<string>> = new Map();
 
   public get size(): number {
     return this.nodes.size;
@@ -20,7 +20,7 @@ export class DAG<T extends Node> {
   public add(node: T, override: boolean = false): void {
     if (!this.has(node.id) || override) {
       this.nodes.set(node.id, node);
-      this.evict(node.id);
+      this.evictPaths(node.id);
     };
   }
 
@@ -45,7 +45,7 @@ export class DAG<T extends Node> {
       this.nodes.get(dependentId)?.dependencies.delete(id);
     }
 
-    this.evict(node.id);
+    this.evictPaths(id);
     return this.nodes.delete(id);
   }
 
@@ -67,14 +67,15 @@ export class DAG<T extends Node> {
   public link(sourceId: string, targetId: string): boolean {
     const source = this.get(sourceId);
     const target = this.get(targetId);
-
     if (!source || !target) return false;
+
     if (this.cycle(sourceId, targetId)) return false
 
     source.dependencies.add(targetId);
     target.dependents.add(sourceId);
 
-    this.paths.clear();
+    this.evictPaths(sourceId);
+    this.evictPaths(targetId);
     return true;
   }
 
@@ -89,7 +90,8 @@ export class DAG<T extends Node> {
     source.dependencies.delete(targetId);
     target.dependents.delete(sourceId);
 
-    this.paths.clear();
+    this.evictPaths(sourceId);
+    this.evictPaths(targetId);
     return true;
   }
 
@@ -101,7 +103,7 @@ export class DAG<T extends Node> {
 
     for (const id of scope) {
       const node = this.get(id)!;
-      const incomingNodes = direction === 'dependencies' ? node.dependencies : node.dependents;
+      const incomingNodes = this.getNeighbors(node, direction);
       for (const incoming of incomingNodes) {
         if (scope.has(incoming)) {
           degree.set(id, (degree.get(id) ?? 0) + 1);
@@ -121,7 +123,7 @@ export class DAG<T extends Node> {
       result.push(id);
 
       const node = this.get(id)!;
-      const outgoingNodes = direction === 'dependencies' ? node.dependents : node.dependencies;
+      const outgoingNodes = this.getNeighbors(node, this.reverseDirection(direction));
       for (const adj of outgoingNodes) {
         if (!scope.has(adj)) continue;
         const deg = (degree.get(adj) ?? 0) - 1;
@@ -154,7 +156,7 @@ export class DAG<T extends Node> {
 
     for (const id of visited) {
       const node = this.get(id)!;
-      const links = direction === 'dependencies' ? node.dependencies : node.dependents;
+      const links = this.getNeighbors(node, direction);
       for (const targetId of links) {
         if (visited.has(targetId)) {
           direction === 'dependencies'
@@ -173,15 +175,44 @@ export class DAG<T extends Node> {
 
   public getPaths(sourceId: string, direction: Direction = 'dependencies'): Set<string> {
     if (!this.has(sourceId)) return new Set();
-    const cacheKey = `${direction}:${sourceId}`;
+
+    const cacheKey = this.cacheKey(direction, sourceId);
     if (this.paths.has(cacheKey)) return this.paths.get(cacheKey)!;
 
     const visited = new Set<string>()
     this.traverse(sourceId, id => { visited.add(id) }, direction);
 
     visited.delete(sourceId);
+
     this.paths.set(cacheKey, visited);
     return visited
+  }
+
+  public getAllPaths(sourceId: string, direction: Direction = 'dependents'): string[][] {
+    const result: string[][] = [];
+    const path: string[] = [];
+
+    const dfs = (currentId: string) => {
+      const node = this.get(currentId);
+      if (!node) return;
+
+      path.push(currentId);
+
+      const neighbors = this.getNeighbors(node, direction);
+
+      if (neighbors.size === 0) {
+        result.push([...path]);
+      } else {
+        for (const neighbor of neighbors) {
+          dfs(neighbor);
+        }
+      }
+
+      path.pop();
+    };
+
+    dfs(sourceId);
+    return result;
   }
 
   public forEach(sourceId: string, callback: (id: string) => boolean | void): void {
@@ -207,7 +238,7 @@ export class DAG<T extends Node> {
       const node = this.get(id)
       if (!node) continue
 
-      const neighbors = direction === 'dependencies' ? node.dependencies : node.dependents;
+      const neighbors = this.getNeighbors(node, direction);
       for (const neighbor of neighbors) {
         if (!visited.has(neighbor)) {
           stack.push(neighbor);
@@ -216,17 +247,29 @@ export class DAG<T extends Node> {
     }
   }
 
-  protected evict(id: string): void {
+  protected evictPaths(id: string): void {
     const toDelete: string[] = [];
     for (const [key, reachable] of this.paths.entries()) {
-      const [, source] = key.split(':');
-      if (source === id || reachable.has(id)) {
+      const [direction, sourceId] = key.split(':');
+      if (sourceId === id || reachable.has(id)) {
         toDelete.push(key);
       }
     }
     for (const key of toDelete) {
       this.paths.delete(key);
     }
+  }
+
+  private getNeighbors(node: T, direction: Direction): Set<string> {
+    return direction === 'dependencies' ? node.dependencies : node.dependents;
+  }
+
+  private reverseDirection(direction: Direction): Direction {
+    return direction === 'dependencies' ? 'dependents' : 'dependencies';
+  }
+
+  private cacheKey(direction: Direction, sourceId: string): string {
+    return `${direction}:${sourceId}`;
   }
 }
 
@@ -268,7 +311,7 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
   protected resumeResolvers: (() => void)[] = [];
 
   public async run(id: string, version?: number, signal?: AbortSignal, rootId?: string): Promise<void> {
-    if (this.pause) {
+    if (this.paused) {
       this.resume(true)
     }
 
@@ -366,7 +409,30 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
     return version !== currentVersion || !!signal?.aborted;
   }
 
-  protected async _run(id: string, version?: number, signal?: AbortSignal, rootId: string = id): Promise<void> {
+  protected async execute(node: T, version: number, signal?: AbortSignal) {
+    if (this.shouldAbort(node.id, version, signal)) return;
+
+    const depsData = this.getDependencyData(node.id);
+
+    try {
+      await Promise.resolve(node.onLoad(depsData, node));
+      if (this.shouldAbort(node.id, version, signal)) return;
+
+      node.status = Status.Success;
+      node.onSuccess?.(depsData, node);
+    } catch (error) {
+      if (this.shouldAbort(node.id, version, signal)) return;
+
+      node.status = Status.Failed;
+      node.onFailed?.(error as Error, depsData, node);
+    } finally {
+      if (this.shouldAbort(node.id, version, signal)) return;
+
+      node.onFinished?.(depsData, node);
+    }
+  }
+
+  private async _run(id: string, version?: number, signal?: AbortSignal, rootId: string = id): Promise<void> {
     const nodeVersion = this.nodeVersions.get(id) ?? 0;
     if (version === undefined) version = nodeVersion;
 
@@ -393,24 +459,8 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
     const activeNode = this.tryActive(id);
     if (activeNode === false) return;
 
-    const depsData = this.getDependencyData(id);
+    await this.execute(activeNode, version, signal);
 
-    try {
-      await Promise.resolve(activeNode.onLoad(depsData, activeNode));
-      if (this.shouldAbort(id, version, signal)) return;
-
-      activeNode.status = Status.Success;
-      activeNode.onSuccess?.(depsData, activeNode);
-    } catch (error) {
-      if (this.shouldAbort(id, version, signal)) return;
-
-      activeNode.status = Status.Failed;
-      activeNode.onFailed?.(error as Error, depsData, activeNode);
-    } finally {
-      if (this.shouldAbort(id, version, signal)) return;
-
-      activeNode.onFinished?.(depsData, activeNode);
-    }
 
     if (rootId === id) {
       const tasks: Promise<void>[] = []
@@ -424,143 +474,192 @@ export class StatefulDAG<D, T extends StatefulNode<D>> extends DAG<T> {
 
 export interface PriorityDAGOptions {
   maxConcurrency: number;
+  useIdleCallback: boolean;
 }
+
+const nextIdle = (callback: () => void) => {
+  return typeof requestIdleCallback === 'function'
+    ? requestIdleCallback(callback, { timeout: 1000 })
+    : setTimeout(callback, 16) as unknown as number;
+};
+
+const cancelIdle = (id: number): void => {
+  return typeof requestIdleCallback === 'function'
+    ? cancelIdleCallback(id)
+    : clearTimeout(id);
+};
 
 export class PriorityNode<T> extends StatefulNode<T> {
   public priority: number = 0;
+  public _version?: number;
+  public _signal?: AbortSignal;
 }
 
+const DEFAULT_OPTIONS: PriorityDAGOptions = {
+  maxConcurrency: 2,
+  useIdleCallback: false
+};
+
+const WORK_CALL_INTERVAL_LIMIT = 10;
+
+type PathInfo = {
+  priority: number;
+  bestParentId?: string;
+};
+
+
 export class PriorityDAG<D, T extends PriorityNode<D>> extends StatefulDAG<D, T> {
-  public static options: PriorityDAGOptions = {
-    maxConcurrency: 3
-  }
+  private readonly options: PriorityDAGOptions;
 
-  private readonly options: PriorityDAGOptions
+  private pathInfoMap = new Map<string, PathInfo>();
 
-  protected readonly queue: PriorityQueue<T> = new PriorityQueue((a, b) => b.priority - a.priority);
+  protected readonly queue: PriorityQueue<T> = new PriorityQueue(
+    (a, b) => b.priority - a.priority,
+    false
+  );
 
-  private readonly queuedIds: Set<string> = new Set();
+  private readonly workers = new Set<string>();
+  private readonly workersAvail = new Set<string>();
+  private readonly workersBusy = new Set<string>();
 
-  private runningCount = 0;
-  private workCallTimeout: any = null;
-  private nextWorkCall = 0;
-  public readonly WORK_CALL_INTERVAL_LIMIT: number = 100;
+  private nextWorkCall: number = 0;
+  private workCallTimeout: number | null = null;
+
+  private queuedIds = new Set<string>();
 
   public constructor(options: Partial<PriorityDAGOptions> = {}) {
-    super()
-
-    this.options = Object.assign({}, PriorityDAG.options, options);
+    super();
+    this.options = Object.assign({}, DEFAULT_OPTIONS, options);
   }
 
-  private enqueue(node: T) {
-    if (this.queuedIds.has(node.id)) return;
-    this.queuedIds.add(node.id);
-    this.queue.push(node);
-  }
+  public override async run(id: string, version?: number, signal?: AbortSignal): Promise<void> {
 
-  private dequeue(): T | undefined {
-    const node = this.queue.poll();
-    if (node) this.queuedIds.delete(node.id);
-    return node;
-  }
-
-  public async run(id: string, version?: number, signal?: AbortSignal) {
     const node = this.get(id);
     if (!node) return;
 
-    if (this.isFinished(id)) return; // 任务已完成
-    if (!this.isReady(id)) return;   // 依赖未满足
+    if (this.paused) this.resume(true);
 
-    this.enqueue(node);
-    this.scheduleWork();
+    this.enqueue(node, version, signal);
+    console.log(this.pathInfoMap)
+    // this.work();
+  }
+  private updatePathInfoUpstream(id: string, visited = new Set<string>()): PathInfo {
+    if (visited.has(id)) {
+      // 防止环依赖导致死循环
+      return { priority: 0 };
+    }
+    visited.add(id);
+
+    const node = this.get(id);
+    if (!node) return { priority: 0 };
+
+    let maxParentInfo: PathInfo = { priority: 0 };
+    let bestParentId: string | undefined;
+
+    for (const parentId of node.dependencies) {
+      const parentInfo = this.updatePathInfoUpstream(parentId, visited);
+      if (parentInfo.priority > maxParentInfo.priority) {
+        maxParentInfo = parentInfo;
+        bestParentId = parentId;
+      }
+    }
+
+    const totalPriority = node.priority + maxParentInfo.priority;
+    const info: PathInfo = {
+      priority: totalPriority,
+      bestParentId,
+    };
+
+    this.pathInfoMap.set(id, info);
+    return info;
   }
 
-  private scheduleWork() {
-    if (this.workCallTimeout) return;
+  public add(node: T, override: boolean = false): void {
+    if (!this.has(node.id) || override) {
+      this.nodes.set(node.id, node);
+      this.evictPaths(node.id);
+      this.updatePathInfoUpstream(node.id);
+      this.enqueue(node);
+    }
+  }
+
+  private enqueue(node: T, version?: number, signal?: AbortSignal): void {
+    if (this.queuedIds.has(node.id)) return;
+
+    version = this.nodeVersions.get(node.id) ?? 0;
+    node._version = version;
+    node._signal = signal;
+
+    this.queue.push(node);
+    this.queuedIds.add(node.id);
+  }
+
+  private work(immediate: boolean = false) {
+    if (this.workCallTimeout !== null) return;
 
     const now = Date.now();
-    this.nextWorkCall = Math.max(this.nextWorkCall + this.WORK_CALL_INTERVAL_LIMIT, now);
-    const delay = this.nextWorkCall - now;
+    this.nextWorkCall = Math.max(this.nextWorkCall + WORK_CALL_INTERVAL_LIMIT, now);
+    const timeUntilNextWorkCall = immediate ? 0 : this.nextWorkCall - now;
 
     this.workCallTimeout = setTimeout(() => {
       this.workCallTimeout = null;
       this.doWork();
-    }, delay);
+    }, timeUntilNextWorkCall);
   }
 
+  private getReadyNodesForExecution(): T[] {
+    const ready: T[] = [];
 
-  private async doWork() {
-    while (this.runningCount < this.options.maxConcurrency && this.queue.size > 0) {
-      const node = this.dequeue();
-      if (!node) break;
+    for (const node of this.queue.toArray()) {
+      if (
+        this.queuedIds.has(node.id) &&
+        super.isReady(node.id) &&
+        !this.workersBusy.has(node.id)
+      ) {
+        ready.push(node);
+      }
 
-      if (this.isFinished(node.id)) continue;
-
-      if (!this.isReady(node.id)) {
-        // 依赖未满足，重新入队尾
-        this.enqueue(node);
+      if (ready.length >= this.options.maxConcurrency - this.workersBusy.size) {
         break;
       }
-
-      this.runningCount++;
-      this._run(node.id, this.nodeVersions.get(node.id), undefined, node.id)
-        .finally(() => {
-          this.runningCount--;
-          this.scheduleWork();
-        });
     }
+
+    return ready;
   }
 
-  // 重写 _run，去除递归，依赖由调度器负责执行
-  protected override async _run(id: string, version?: number, signal?: AbortSignal, rootId: string = id): Promise<void> {
-    const nodeVersion = this.nodeVersions.get(id) ?? 0;
-    if (version === undefined) version = nodeVersion;
-
-    if (this.shouldAbort(id, version, signal)) return;
+  private async doWork() {
     await this.waitResume();
-    if (this.shouldAbort(id, version, signal)) return;
 
-    const node = this.get(id);
-    if (!node) return;
+    if (this.queue.size === 0) return;
+    if (this.workersBusy.size >= this.options.maxConcurrency) return;
 
-    // 依赖不满足，放弃执行，调度器会处理
-    for (const depId of node.dependencies) {
-      const depNode = this.get(depId);
-      if (!depNode || depNode.status !== Status.Success) {
-        return;
-      }
-    }
+    const readyNodes = this.getReadyNodesForExecution();
 
-    const activeNode = this.tryActive(id);
-    if (activeNode === false) return;
+    for (const node of readyNodes) {
+      if (!this.tryActive(node.id)) continue;
 
-    const depsData = this.getDependencyData(id);
+      this.queuedIds.delete(node.id);
+      this.queue.remove(node);
 
-    try {
-      await Promise.resolve(activeNode.onLoad?.(depsData, activeNode));
-      if (this.shouldAbort(id, version, signal)) return;
+      const version = this.nodeVersions.get(node.id) ?? 0;
+      node._version = version;
 
-      activeNode.status = Status.Success;
-      activeNode.onSuccess?.(depsData, activeNode);
-    } catch (error) {
-      if (this.shouldAbort(id, version, signal)) return;
+      this.workersBusy.add(node.id);
+      this.workersAvail.delete(node.id);
+      this.workers.add(node.id);
 
-      activeNode.status = Status.Failed;
-      activeNode.onFailed?.(error as Error, depsData, activeNode);
-    } finally {
-      if (this.shouldAbort(id, version, signal)) return;
-
-      activeNode.onFinished?.(depsData, activeNode);
-    }
-
-    // 执行完后，将所有依赖当前节点的节点入队，等待调度
-    for (const dependentId of activeNode.dependents) {
-      const dependentNode = this.get(dependentId);
-      if (!dependentNode) continue;
-
-      if (!this.queuedIds.has(dependentId) && !this.isFinished(dependentId)) {
-        this.enqueue(dependentNode);
-      }
+      this.execute(node, version).then(() => {
+        for (const dependentId of node.dependents) {
+          const dep = this.get(dependentId);
+          if (dep && dep.status === Status.Waiting) {
+            this.enqueue(dep);
+          }
+        }
+      }).finally(() => {
+        this.workersBusy.delete(node.id);
+        this.workersAvail.add(node.id);
+        this.work(true); // Trigger next work cycle
+      });
     }
   }
 }

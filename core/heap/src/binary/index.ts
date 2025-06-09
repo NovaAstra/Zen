@@ -2,11 +2,19 @@ export type Comparator<T> = (a: T, b: T) => number;
 
 export class BinaryHeap<T> {
   private readonly heap: T[] = [];
+  private readonly indexMap: Map<T, number> = new Map();
 
-  public constructor(private readonly comparator: Comparator<T>) { }
+  public constructor(
+    private readonly comparator: Comparator<T>,
+    private readonly duplicate: boolean = true
+  ) { }
 
   public get size(): number {
     return this.heap.length
+  }
+
+  public has(node: T): boolean {
+    return this.indexMap.has(node);
   }
 
   public peek(): T | undefined {
@@ -17,20 +25,55 @@ export class BinaryHeap<T> {
     if (this.size === 0) return undefined;
 
     const top = this.heap[0];
-    const last = this.heap.pop()!;
+    this.indexMap.delete(top);
 
+    const last = this.heap.pop()!;
     if (this.size > 0) {
       this.heap[0] = last;
+      this.indexMap.set(last, 0);
       this.heapifyDown();
     }
 
     return top;
   }
 
-  public push(node: T): number {
+  public push(node: T,): number {
+    if (!this.duplicate) {
+      const index = this.indexMap.get(node);
+      if (index !== undefined) {
+        this.heap[index] = node;
+        this.heapifyUp(index);
+        this.heapifyDown(index);
+        return this.size;
+      }
+    }
+
     this.heap.push(node);
-    this.heapifyUp();
+    this.indexMap.set(node, this.size - 1);
+    this.heapifyUp(this.size - 1);
     return this.size;
+  }
+
+  public remove(node: T): boolean {
+    const index = this.indexMap.get(node);
+    if (index === undefined) return false;
+
+    this.indexMap.delete(node);
+
+    const lastIndex = this.size - 1;
+    if (index === lastIndex) {
+      this.heap.pop();
+      return true;
+    }
+
+    const lastNode = this.heap.pop()!;
+    this.heap[index] = lastNode;
+    this.indexMap.set(lastNode, index);
+
+    this.heapifyDown(index);
+    this.heapifyUp(index);
+
+    return true;
   }
 
   public rebuild(): void {
@@ -41,6 +84,7 @@ export class BinaryHeap<T> {
 
   public clear(): void {
     this.heap.length = 0;
+    this.indexMap.clear()
   }
 
   public toArray(): readonly T[] {
@@ -118,5 +162,8 @@ export class BinaryHeap<T> {
 
   private swap(i: number, j: number): void {
     [this.heap[i], this.heap[j]] = [this.heap[j], this.heap[i]];
+
+    this.indexMap.set(this.heap[i], i);
+    this.indexMap.set(this.heap[j], j);
   }
 }
