@@ -608,27 +608,27 @@ export class PriorityDAG<D, T extends PriorityNode<D>> extends StatefulDAG<D, T>
   }
 
   // 动态提升某个节点及其路径优先级
-public boostPriority(nodeId: string, delta: number): void {
-  const node = this.get(nodeId);
-  if (!node || !this.reachable.has(nodeId)) return;
+  public boostPriority(nodeId: string, delta: number): void {
+    const node = this.get(nodeId);
+    if (!node || !this.reachable.has(nodeId)) return;
 
-  node.priority += delta;
+    node.priority += delta;
 
-  const memo = new Map<string, number>();
-  // 只对当前reachable子图重新计算 max path priority
-  for (const id of this.reachable) {
-    this.computeMaxPathPriority(id, memo);
-  }
+    const memo = new Map<string, number>();
+    // 只对当前reachable子图重新计算 max path priority
+    for (const id of this.reachable) {
+      this.computeMaxPathPriority(id, memo);
+    }
 
-  // 重建优先队列中的元素顺序（不移除并重插入会导致堆结构失效）
-  const nodes: T[] = [];
-  while (this.pq.size > 0) {
-    nodes.push(this.pq.poll()!);
+    // 重建优先队列中的元素顺序（不移除并重插入会导致堆结构失效）
+    const nodes: T[] = [];
+    while (this.pq.size > 0) {
+      nodes.push(this.pq.poll()!);
+    }
+    for (const n of nodes) {
+      this.pq.push(n);
+    }
   }
-  for (const n of nodes) {
-    this.pq.push(n);
-  }
-}
 
 
   public async run(startNodeId: string, version?: number, signal?: AbortSignal): Promise<void> {
