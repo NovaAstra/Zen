@@ -500,166 +500,16 @@ const DEFAULT_OPTIONS: PriorityDAGOptions = {
   useIdleCallback: false
 };
 
-const WORK_CALL_INTERVAL_LIMIT = 10;
-
-type PathInfo = {
-  priority: number;
-  bestParentId?: string;
-};
-
-
 export class PriorityDAG<D, T extends PriorityNode<D>> extends StatefulDAG<D, T> {
   private readonly options: PriorityDAGOptions;
-
-  private pathInfoMap = new Map<string, PathInfo>();
 
   protected readonly queue: PriorityQueue<T> = new PriorityQueue(
     (a, b) => b.priority - a.priority,
     false
   );
 
-  private readonly workers = new Set<string>();
-  private readonly workersAvail = new Set<string>();
-  private readonly workersBusy = new Set<string>();
-
-  private nextWorkCall: number = 0;
-  private workCallTimeout: number | null = null;
-
-  private queuedIds = new Set<string>();
-
   public constructor(options: Partial<PriorityDAGOptions> = {}) {
     super();
     this.options = Object.assign({}, DEFAULT_OPTIONS, options);
-  }
-
-  public override async run(id: string, version?: number, signal?: AbortSignal): Promise<void> {
-
-    const node = this.get(id);
-    if (!node) return;
-
-    if (this.paused) this.resume(true);
-
-    this.enqueue(node, version, signal);
-    console.log(this.pathInfoMap)
-    // this.work();
-  }
-  private updatePathInfoUpstream(id: string, visited = new Set<string>()): PathInfo {
-    if (visited.has(id)) {
-      // 防止环依赖导致死循环
-      return { priority: 0 };
-    }
-    visited.add(id);
-
-    const node = this.get(id);
-    if (!node) return { priority: 0 };
-
-    let maxParentInfo: PathInfo = { priority: 0 };
-    let bestParentId: string | undefined;
-
-    for (const parentId of node.dependencies) {
-      const parentInfo = this.updatePathInfoUpstream(parentId, visited);
-      if (parentInfo.priority > maxParentInfo.priority) {
-        maxParentInfo = parentInfo;
-        bestParentId = parentId;
-      }
-    }
-
-    const totalPriority = node.priority + maxParentInfo.priority;
-    const info: PathInfo = {
-      priority: totalPriority,
-      bestParentId,
-    };
-
-    this.pathInfoMap.set(id, info);
-    return info;
-  }
-
-  public add(node: T, override: boolean = false): void {
-    if (!this.has(node.id) || override) {
-      this.nodes.set(node.id, node);
-      this.evictPaths(node.id);
-      this.updatePathInfoUpstream(node.id);
-      this.enqueue(node);
-    }
-  }
-
-  private enqueue(node: T, version?: number, signal?: AbortSignal): void {
-    if (this.queuedIds.has(node.id)) return;
-
-    version = this.nodeVersions.get(node.id) ?? 0;
-    node._version = version;
-    node._signal = signal;
-
-    this.queue.push(node);
-    this.queuedIds.add(node.id);
-  }
-
-  private work(immediate: boolean = false) {
-    if (this.workCallTimeout !== null) return;
-
-    const now = Date.now();
-    this.nextWorkCall = Math.max(this.nextWorkCall + WORK_CALL_INTERVAL_LIMIT, now);
-    const timeUntilNextWorkCall = immediate ? 0 : this.nextWorkCall - now;
-
-    this.workCallTimeout = setTimeout(() => {
-      this.workCallTimeout = null;
-      this.doWork();
-    }, timeUntilNextWorkCall);
-  }
-
-  private getReadyNodesForExecution(): T[] {
-    const ready: T[] = [];
-
-    for (const node of this.queue.toArray()) {
-      if (
-        this.queuedIds.has(node.id) &&
-        super.isReady(node.id) &&
-        !this.workersBusy.has(node.id)
-      ) {
-        ready.push(node);
-      }
-
-      if (ready.length >= this.options.maxConcurrency - this.workersBusy.size) {
-        break;
-      }
-    }
-
-    return ready;
-  }
-
-  private async doWork() {
-    await this.waitResume();
-
-    if (this.queue.size === 0) return;
-    if (this.workersBusy.size >= this.options.maxConcurrency) return;
-
-    const readyNodes = this.getReadyNodesForExecution();
-
-    for (const node of readyNodes) {
-      if (!this.tryActive(node.id)) continue;
-
-      this.queuedIds.delete(node.id);
-      this.queue.remove(node);
-
-      const version = this.nodeVersions.get(node.id) ?? 0;
-      node._version = version;
-
-      this.workersBusy.add(node.id);
-      this.workersAvail.delete(node.id);
-      this.workers.add(node.id);
-
-      this.execute(node, version).then(() => {
-        for (const dependentId of node.dependents) {
-          const dep = this.get(dependentId);
-          if (dep && dep.status === Status.Waiting) {
-            this.enqueue(dep);
-          }
-        }
-      }).finally(() => {
-        this.workersBusy.delete(node.id);
-        this.workersAvail.add(node.id);
-        this.work(true); // Trigger next work cycle
-      });
-    }
   }
 }
