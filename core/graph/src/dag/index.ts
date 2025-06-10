@@ -6,16 +6,7 @@ export class Node {
   public readonly dependencies: Set<string> = new Set();
   public readonly dependents: Set<string> = new Set();
 
-  public readonly dependencieRefs: Set<Node> = new Set();
-  public readonly dependentRefs: Set<Node> = new Set();
-
   public constructor(public readonly id: string) { }
-
-  public add(...nodes: Node[] | string[]) {
-
-  }
-
-  public remove(...nodes: Node[] | string[]) { }
 }
 
 export class DAG<T extends Node> {
