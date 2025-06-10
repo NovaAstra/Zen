@@ -6,7 +6,16 @@ export class Node {
   public readonly dependencies: Set<string> = new Set();
   public readonly dependents: Set<string> = new Set();
 
+  public readonly dependencieRefs: Set<Node> = new Set();
+  public readonly dependentRefs: Set<Node> = new Set();
+
   public constructor(public readonly id: string) { }
+
+  public add(...nodes: Node[] | string[]) {
+
+  }
+
+  public remove(...nodes: Node[] | string[]) { }
 }
 
 export class DAG<T extends Node> {
@@ -17,13 +26,10 @@ export class DAG<T extends Node> {
     return this.nodes.size;
   }
 
-  public add(node: T, override: boolean = false): void {
-    if (!this.has(node.id) || override) {
-      this.nodes.set(node.id, node);
-      this.evictPaths(node.id);
-    };
+  public add(node: T): void {
+    this.nodes.set(node.id, node);
+    this.evictPaths(node.id);
   }
-
 
   public get(id: string): T | undefined {
     return this.nodes.get(id);
@@ -103,7 +109,7 @@ export class DAG<T extends Node> {
 
     for (const id of scope) {
       const node = this.get(id)!;
-      const incomingNodes = this.getNeighbors(node, direction);
+      const incomingNodes = this.getEdges(node, direction);
       for (const incoming of incomingNodes) {
         if (scope.has(incoming)) {
           degree.set(id, (degree.get(id) ?? 0) + 1);
@@ -123,7 +129,7 @@ export class DAG<T extends Node> {
       result.push(id);
 
       const node = this.get(id)!;
-      const outgoingNodes = this.getNeighbors(node, this.reverseDirection(direction));
+      const outgoingNodes = this.getEdges(node, this.reverseDirection(direction));
       for (const adj of outgoingNodes) {
         if (!scope.has(adj)) continue;
         const deg = (degree.get(adj) ?? 0) - 1;
@@ -156,7 +162,7 @@ export class DAG<T extends Node> {
 
     for (const id of visited) {
       const node = this.get(id)!;
-      const links = this.getNeighbors(node, direction);
+      const links = this.getEdges(node, direction);
       for (const targetId of links) {
         if (visited.has(targetId)) {
           direction === 'dependencies'
@@ -198,7 +204,7 @@ export class DAG<T extends Node> {
 
       path.push(currentId);
 
-      const neighbors = this.getNeighbors(node, direction);
+      const neighbors = this.getEdges(node, direction);
 
       if (neighbors.size === 0) {
         result.push([...path]);
@@ -223,25 +229,25 @@ export class DAG<T extends Node> {
     return this.hasPath(targetId, sourceId);
   }
 
-  protected traverse(sourceId: string, callback: (id: string) => boolean | void, direction: Direction = 'dependencies'): void {
+  protected traverse(id: string, callback: (id: string) => boolean | void, direction: Direction = 'dependencies'): void {
     const visited = new Set<string>()
-    const stack = [sourceId]
+    const stack = [id]
 
     while (stack.length) {
-      const id = stack.pop()!
-      if (visited.has(id)) continue
-      visited.add(id)
+      const top = stack.pop()!
+      if (visited.has(top)) continue
+      visited.add(top)
 
-      const stop = callback(id)
+      const stop = callback(top)
       if (stop === false) break
 
-      const node = this.get(id)
+      const node = this.get(top)
       if (!node) continue
 
-      const neighbors = this.getNeighbors(node, direction);
-      for (const neighbor of neighbors) {
-        if (!visited.has(neighbor)) {
-          stack.push(neighbor);
+      const nodeIds = this.getEdges(node, direction);
+      for (const nodeId of nodeIds) {
+        if (!visited.has(nodeId)) {
+          stack.push(nodeId);
         }
       }
     }
@@ -260,7 +266,7 @@ export class DAG<T extends Node> {
     }
   }
 
-  private getNeighbors(node: T, direction: Direction): Set<string> {
+  private getEdges(node: T, direction: Direction): Set<string> {
     return direction === 'dependencies' ? node.dependencies : node.dependents;
   }
 
@@ -634,6 +640,7 @@ export class PriorityDAG<D, T extends PriorityNode<D>> extends StatefulDAG<D, T>
   public async run(startNodeId: string, version?: number, signal?: AbortSignal): Promise<void> {
     if (!this.has(startNodeId)) throw new Error(`Node ${startNodeId} not found`);
 
+    // 所有下游节点
     this.reachable = this.getDownstreamReachableNodes(startNodeId);
     const memo = new Map<string, number>();
     for (const id of this.reachable) this.computeMaxPathPriority(id, memo);
