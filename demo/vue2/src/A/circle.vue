@@ -4,7 +4,7 @@
 </template>
 
 <script>
-import { Status, PriorityNode } from "@zen-ui/headless";
+import { Status, StatefulNode } from "@zen-ui/headless";
 
 export default {
   inject: ["root"],
@@ -35,14 +35,7 @@ export default {
     },
   },
   created() {
-    const stateNode = new PriorityNode(this.node.label, this.node.label, null);
-
-    if (this.node.label === 'H' ||this.node.label === 'X') {
-      stateNode.priority = 100
-    }
-    if (this.node.label === 'T') {
-      stateNode.priority = 60
-    }
+    const stateNode = new StatefulNode(this.node.label, this.node.label, null);
 
     this.node._state = stateNode;
 
@@ -67,7 +60,7 @@ export default {
   },
   methods: {
     handleClick() {
-      this.root.dag.run(this.node.label);
+      this.root.dag.restart(this.node.label);
     },
   },
 };

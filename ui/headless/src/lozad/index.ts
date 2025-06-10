@@ -1,8 +1,8 @@
-import { PriorityDAG, PriorityNode, Status, Direction } from "@zen-core/graph"
+import { PriorityDAG, PriorityNode, Status, StatefulDAG,StatefulNode, Direction } from "@zen-core/graph"
 import { PriorityQueue } from "@zen-core/queue"
 
 export {
-  PriorityDAG, PriorityNode, Status
+  PriorityDAG, PriorityNode, Status,StatefulDAG,StatefulNode,
 }
 
 export interface Options {
