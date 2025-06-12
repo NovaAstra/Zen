@@ -264,6 +264,8 @@ export class DAG<P, T extends Node<P>> {
 
   private readonly edgeWeights: Map<string, Map<string, number>> = new Map();
 
+  private readonly priorities: Map<string, number> = new Map();
+
   private readonly orders: Map<string, T[]> = new Map();
   private readonly subgraphs: Map<string, DAG<P, T>> = new Map();
 
@@ -332,15 +334,16 @@ export class DAG<P, T extends Node<P>> {
     const id = this.resolveId(node);
     if (!this.nodes.has(id)) return this;
 
-    for (const source of this.outEdges.get(id) ?? []) {
-      this.outEdges.get(source)!.delete(id);
-      this.edgeWeights.get(source)?.delete(id);
-    }
-
-    for (const target of this.inEdges.get(id) ?? []) {
+    for (const target of this.outEdges.get(id) ?? []) {
       this.inEdges.get(target)?.delete(id);
       this.inDegree.set(target, (this.inDegree.get(target) ?? 1) - 1);
       this.edgeWeights.get(id)?.delete(target);
+    }
+
+    for (const source of this.inEdges.get(id) ?? []) {
+      this.outEdges.get(source)?.delete(id);
+      this.edgeWeights.get(source)?.delete(id);
+      this.inDegree.set(id, (this.inDegree.get(id) ?? 1) - 1);
     }
 
     this.nodes.delete(id);
@@ -391,6 +394,12 @@ export class DAG<P, T extends Node<P>> {
     return direction === Direction.In ? this.getInEdges(node) : this.getOutEdges(node)
   }
 
+  public setPriority(node: string | T, priority: number) {
+    const id = this.resolveId(node);
+    this.priorities.set(id, priority);
+    this.markDirty(Dirty.Topo);
+  }
+
   public isReachable(source: string | T, target: string | T): boolean {
     const srcId = this.resolveId(source);
     const tgtId = this.resolveId(target);
@@ -413,12 +422,14 @@ export class DAG<P, T extends Node<P>> {
   ) {
     const rootId = this.resolveId(node);
     const key = this.createKey(rootId, direction);
-    if (this.orders.has(key)) return this.orders.get(key)!;
+    if (!this.isDirty(Dirty.Topo) && this.orders.has(key)) {
+      return this.orders.get(key)!;
+    }
 
     const subdag = this.subgraph(node, direction);
-    const inDegree = new Map();
+
+    const inDegree = new Map<string, number>();
     const distances = new Map<string, number>();
-    const visited = new Set<string>();
 
     const reachable = subdag.getReachs(rootId, direction);
     reachable.add(rootId);
@@ -429,25 +440,33 @@ export class DAG<P, T extends Node<P>> {
     }
 
     const queue = new PriorityQueue<string>((a, b) => {
-      return (distances.get(b) ?? Infinity) - (distances.get(a) ?? Infinity);
+      const da = distances.get(a) ?? Infinity;
+      const db = distances.get(b) ?? Infinity;
+      const pa = this.priorities.get(a) ?? 0;
+      const pb = this.priorities.get(b) ?? 0;
+      return (da + pa) - (db + pb);
     });
 
-    queue.push(rootId);
+    for (const [id, deg] of inDegree) {
+      if (deg === 0) queue.push(id);
+    }
 
     const result: T[] = [];
+    const visited = new Set<string>();
     while (queue.size > 0) {
       const id = queue.poll()!;
       if (visited.has(id)) continue;
       visited.add(id);
+
       result.push(subdag.getNode(id));
 
       for (const neighbor of subdag.getEdges(id, direction)) {
         if (!reachable.has(neighbor)) continue;
 
         const weight = subdag.edgeWeights.get(id)?.get(neighbor) ?? 1;
-        const dist = distances.get(id)! + weight;
-        if (dist < (distances.get(neighbor) ?? Infinity)) {
-          distances.set(neighbor, dist);
+        const alt = distances.get(id)! + weight;
+        if (alt < (distances.get(neighbor) ?? Infinity)) {
+          distances.set(neighbor, alt);
         }
 
         inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
@@ -470,7 +489,9 @@ export class DAG<P, T extends Node<P>> {
     if (!this.hasNode(rootId)) return new DAG<P, T>();
 
     const key = this.createKey(rootId, direction);
-    if (this.subgraphs.has(key)) return this.subgraphs.get(key)!;
+    if (!this.isDirty(Dirty.Reach) && this.subgraphs.has(key)) {
+      return this.subgraphs.get(key)!;
+    }
 
     const subdag = this.slice(rootId, direction);
     this.subgraphs.set(key, subdag);
@@ -586,6 +607,14 @@ export enum Status {
 export class StatefulNode<P = unknown> extends Node<P> {
   public status: Status = Status.Waiting;
 
+  public constructor(
+    public readonly id: string,
+    public priority: number = 0,
+    public metadata?: P
+  ) {
+    super(id, metadata)
+  }
+
   public onLoad() { }
 
   public onSuccess() { }
@@ -600,14 +629,3 @@ export class StatefulNode<P = unknown> extends Node<P> {
 export class StatefulDAG<P, T extends StatefulNode<P>> extends DAG<P, T> {
 
 }
-
-const dag = new DAG<unknown, Node>();
-dag.addEdges(
-  { source: 'A', target: 'B', weight: 2 },
-  { source: 'A', target: 'C', weight: 7 },
-  { source: 'B', target: 'D', weight: 3 },
-  { source: 'C', target: 'D' },
-  { source: 'D', target: 'E', weight: 1 }
-);
-
-console.log(dag.order('A', Direction.Out));
