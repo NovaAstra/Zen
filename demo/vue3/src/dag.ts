@@ -263,7 +263,7 @@ export interface OrderStrategy<P, T extends Node<P>> {
 
 
 export class TopoStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
- public sort(
+  public sort(
     _dag: DAG<P, T>,
     subdag: DAG<P, T>,
     startId: string,
@@ -691,7 +691,7 @@ export class StatefulDAG<P, T extends StatefulNode<P>> extends DAG<P, T> {
 const dag = new DAG()
 
 dag.addNodes('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J').addEdges(
-  { source: 'A', target: 'B' },
+  { source: 'A', target: 'B', weight: 50 },
   { source: 'A', target: 'C' },
   { source: 'C', target: 'D' },
   { source: 'A', target: 'E' },
@@ -700,7 +700,7 @@ dag.addNodes('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J').addEdges(
   { source: 'G', target: 'J' },
   { source: 'E', target: 'F' },
   { source: 'F', target: 'H', weight: 100 },
-  { source: 'H', target: 'M'},
+  { source: 'H', target: 'M' },
 )
 
 console.log(dag.order('A'))

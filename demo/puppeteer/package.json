@@ -1,0 +1,12 @@
+{
+  "name": "@zen-demo/puppeteer",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "puppeteer": "22.10.0",
+    "puppeteer-cluster": "^0.24.0"
+  },
+  "devDependencies": {
+    "@types/puppeteer": "^7.0.4"
+  }
+}
