@@ -263,7 +263,7 @@ export interface OrderStrategy<P, T extends Node<P>> {
 
 
 export class TopoStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
-  sort(
+ public sort(
     _dag: DAG<P, T>,
     subdag: DAG<P, T>,
     startId: string,
@@ -302,172 +302,8 @@ export class TopoStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
   }
 }
 
-export class ShortestPathStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
-  sort(
-    _dag: DAG<P, T>,
-    subdag: DAG<P, T>,
-    startId: string,
-    direction: Direction
-  ): T[] {
-    const reachable = subdag.getReachs(startId, direction);
-    reachable.add(startId);
-
-    const inDegree = new Map<string, number>();
-    const distances = new Map<string, number>();
-
-    for (const id of reachable) {
-      inDegree.set(id, subdag.getInEdges(id).size);
-      distances.set(id, id === startId ? 0 : Infinity);
-    }
-
-    const queue = new PriorityQueue<string>((a, b) =>
-      (distances.get(a) ?? Infinity) - (distances.get(b) ?? Infinity)
-    );
-
-    for (const [id, deg] of inDegree.entries()) {
-      if (deg === 0) queue.push(id);
-    }
-
-    const result: T[] = [];
-    const visited = new Set<string>();
-    while (queue.size > 0) {
-      const id = queue.poll()!;
-      if (visited.has(id)) continue;
-      visited.add(id);
-      result.push(subdag.getNode(id));
-
-      for (const neighbor of subdag.getEdges(id, direction)) {
-        const weight = subdag.edgeWeights.get(id)?.get(neighbor) ?? 1;
-        const alt = distances.get(id)! + weight;
-        if (alt < (distances.get(neighbor) ?? Infinity)) {
-          distances.set(neighbor, alt);
-        }
-
-        inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
-        if (inDegree.get(neighbor) === 0) queue.push(neighbor);
-      }
-    }
-
-    if (result.length !== subdag.size) {
-      throw new Error("Cycle detected in DAG");
-    }
-
-    return result;
-  }
-}
-
-export class PriorityStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
-  sort(
-    _dag: DAG<P, T>,
-    subdag: DAG<P, T>,
-    startId: string,
-    direction: Direction,
-    priorities: Map<string, number>
-  ): T[] {
-    const reachable = subdag.getReachs(startId, direction);
-    reachable.add(startId);
-
-    const inDegree = new Map<string, number>();
-    for (const id of reachable) {
-      inDegree.set(id, subdag.getInEdges(id).size);
-    }
-
-    const queue = new PriorityQueue<string>((a, b) => {
-      const pa = priorities.get(a) ?? 0;
-      const pb = priorities.get(b) ?? 0;
-      return pb - pa;
-    });
-
-    for (const [id, deg] of inDegree.entries()) {
-      if (deg === 0) queue.push(id);
-    }
-
-    const result: T[] = [];
-    const visited = new Set<string>();
-    while (queue.size > 0) {
-      const id = queue.poll()!;
-      if (visited.has(id)) continue;
-      visited.add(id);
-      result.push(subdag.getNode(id));
-
-      for (const neighbor of subdag.getEdges(id, direction)) {
-        inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
-        if (inDegree.get(neighbor) === 0) queue.push(neighbor);
-      }
-    }
-
-    if (result.length !== subdag.size) {
-      throw new Error("Cycle detected in DAG");
-    }
-
-    return result;
-  }
-}
-
-export class MaxPathWeightStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
-  sort(
-    _dag: DAG<P, T>,
-    subdag: DAG<P, T>,
-    startId: string,
-    direction: Direction
-  ): T[] {
-    const reachable = subdag.getReachs(startId, direction);
-    reachable.add(startId);
-
-    const inDegree = new Map<string, number>();
-    const maxWeight = new Map<string, number>();
-
-    for (const id of reachable) {
-      inDegree.set(id, subdag.getInEdges(id).size);
-      maxWeight.set(id, id === startId ? 0 : -Infinity);
-    }
-
-    const queue = new PriorityQueue<string>((a, b) =>
-      (maxWeight.get(a) ?? -Infinity) - (maxWeight.get(b) ?? -Infinity)
-    );
-
-    for (const [id, deg] of inDegree.entries()) {
-      if (deg === 0) queue.push(id);
-    }
-
-    const result: T[] = [];
-    const visited = new Set<string>();
-    while (queue.size > 0) {
-      const id = queue.poll()!;
-      if (visited.has(id)) continue;
-      visited.add(id);
-      result.push(subdag.getNode(id));
-
-      for (const neighbor of subdag.getEdges(id, direction)) {
-        const weight = subdag.edgeWeights.get(id)?.get(neighbor) ?? 1;
-        const newWeight = Math.max(maxWeight.get(id)!, weight);
-        if (newWeight > (maxWeight.get(neighbor) ?? -Infinity)) {
-          maxWeight.set(neighbor, newWeight);
-        }
-
-        inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
-        if (inDegree.get(neighbor) === 0) queue.push(neighbor);
-      }
-    }
-
-    if (result.length !== subdag.size) {
-      throw new Error("Cycle detected in DAG");
-    }
-
-    return result;
-  }
-}
-
 export function getOrderStrategy<P, T extends Node<P>>(type: Order): OrderStrategy<P, T> {
   switch (type) {
-    case 'topological':
-      return new TopoStrategy();
-    case 'shortest-path':
-      return new ShortestPathStrategy();
-    case 'priority':
-      return new PriorityStrategy();
-    case 'max-path-weight':
-      return new MaxPathWeightStrategy();
     default:
       return new TopoStrategy();
   }
@@ -650,11 +486,12 @@ export class DAG<P, T extends Node<P>> {
     }
 
     const subdag = this.subgraph(node, direction);
-    const strategy = getOrderStrategy<P, T>(order);
-    const result = strategy.sort(this, subdag, id, direction, this.priorities);
+    console.log(subdag)
+    // const strategy = getOrderStrategy<P, T>(order);
+    // const result = strategy.sort(this, subdag, id, direction, this.priorities);
 
-    this.orders.set(key, result);
-    return result;
+    // this.orders.set(key, result);
+    // return result;
   }
 
   public subgraph(node: string | T, direction: Direction = Direction.Out) {
@@ -863,6 +700,7 @@ dag.addNodes('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J').addEdges(
   { source: 'G', target: 'J' },
   { source: 'E', target: 'F' },
   { source: 'F', target: 'H', weight: 100 },
+  { source: 'H', target: 'M'},
 )
 
-console.log(dag.order('A', 'max-path-weight'))
+console.log(dag.order('A'))
