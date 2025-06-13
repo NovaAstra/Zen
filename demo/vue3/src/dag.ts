@@ -249,6 +249,230 @@ export interface Edge<T> {
   weight?: number;
 }
 
+export type Order = 'topological' | 'shortest-path' | 'priority' | 'max-path-weight';
+
+export interface OrderStrategy<P, T extends Node<P>> {
+  sort(
+    dag: DAG<P, T>,
+    subdag: DAG<P, T>,
+    startId: string,
+    direction: Direction,
+    priorities: Map<string, number>
+  ): T[];
+}
+
+
+export class TopoStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
+  sort(
+    _dag: DAG<P, T>,
+    subdag: DAG<P, T>,
+    startId: string,
+    direction: Direction
+  ): T[] {
+    const reachable = subdag.getReachs(startId, direction);
+    reachable.add(startId);
+
+    const inDegree = new Map<string, number>();
+    for (const id of reachable) {
+      inDegree.set(id, subdag.getInEdges(id).size);
+    }
+
+    const queue: string[] = [];
+    for (const [id, deg] of inDegree.entries()) {
+      if (deg === 0) queue.push(id);
+    }
+
+    const result: T[] = [];
+    while (queue.length > 0) {
+      const id = queue.shift()!;
+      result.push(subdag.getNode(id));
+
+      for (const neighbor of subdag.getEdges(id, direction)) {
+        if (!reachable.has(neighbor)) continue;
+        inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
+        if (inDegree.get(neighbor) === 0) queue.push(neighbor);
+      }
+    }
+
+    if (result.length !== subdag.size) {
+      throw new Error("Cycle detected in DAG");
+    }
+
+    return result;
+  }
+}
+
+export class ShortestPathStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
+  sort(
+    _dag: DAG<P, T>,
+    subdag: DAG<P, T>,
+    startId: string,
+    direction: Direction
+  ): T[] {
+    const reachable = subdag.getReachs(startId, direction);
+    reachable.add(startId);
+
+    const inDegree = new Map<string, number>();
+    const distances = new Map<string, number>();
+
+    for (const id of reachable) {
+      inDegree.set(id, subdag.getInEdges(id).size);
+      distances.set(id, id === startId ? 0 : Infinity);
+    }
+
+    const queue = new PriorityQueue<string>((a, b) =>
+      (distances.get(a) ?? Infinity) - (distances.get(b) ?? Infinity)
+    );
+
+    for (const [id, deg] of inDegree.entries()) {
+      if (deg === 0) queue.push(id);
+    }
+
+    const result: T[] = [];
+    const visited = new Set<string>();
+    while (queue.size > 0) {
+      const id = queue.poll()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      result.push(subdag.getNode(id));
+
+      for (const neighbor of subdag.getEdges(id, direction)) {
+        const weight = subdag.edgeWeights.get(id)?.get(neighbor) ?? 1;
+        const alt = distances.get(id)! + weight;
+        if (alt < (distances.get(neighbor) ?? Infinity)) {
+          distances.set(neighbor, alt);
+        }
+
+        inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
+        if (inDegree.get(neighbor) === 0) queue.push(neighbor);
+      }
+    }
+
+    if (result.length !== subdag.size) {
+      throw new Error("Cycle detected in DAG");
+    }
+
+    return result;
+  }
+}
+
+export class PriorityStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
+  sort(
+    _dag: DAG<P, T>,
+    subdag: DAG<P, T>,
+    startId: string,
+    direction: Direction,
+    priorities: Map<string, number>
+  ): T[] {
+    const reachable = subdag.getReachs(startId, direction);
+    reachable.add(startId);
+
+    const inDegree = new Map<string, number>();
+    for (const id of reachable) {
+      inDegree.set(id, subdag.getInEdges(id).size);
+    }
+
+    const queue = new PriorityQueue<string>((a, b) => {
+      const pa = priorities.get(a) ?? 0;
+      const pb = priorities.get(b) ?? 0;
+      return pb - pa;
+    });
+
+    for (const [id, deg] of inDegree.entries()) {
+      if (deg === 0) queue.push(id);
+    }
+
+    const result: T[] = [];
+    const visited = new Set<string>();
+    while (queue.size > 0) {
+      const id = queue.poll()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      result.push(subdag.getNode(id));
+
+      for (const neighbor of subdag.getEdges(id, direction)) {
+        inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
+        if (inDegree.get(neighbor) === 0) queue.push(neighbor);
+      }
+    }
+
+    if (result.length !== subdag.size) {
+      throw new Error("Cycle detected in DAG");
+    }
+
+    return result;
+  }
+}
+
+export class MaxPathWeightStrategy<P, T extends Node<P>> implements OrderStrategy<P, T> {
+  sort(
+    _dag: DAG<P, T>,
+    subdag: DAG<P, T>,
+    startId: string,
+    direction: Direction
+  ): T[] {
+    const reachable = subdag.getReachs(startId, direction);
+    reachable.add(startId);
+
+    const inDegree = new Map<string, number>();
+    const maxWeight = new Map<string, number>();
+
+    for (const id of reachable) {
+      inDegree.set(id, subdag.getInEdges(id).size);
+      maxWeight.set(id, id === startId ? 0 : -Infinity);
+    }
+
+    const queue = new PriorityQueue<string>((a, b) =>
+      (maxWeight.get(a) ?? -Infinity) - (maxWeight.get(b) ?? -Infinity)
+    );
+
+    for (const [id, deg] of inDegree.entries()) {
+      if (deg === 0) queue.push(id);
+    }
+
+    const result: T[] = [];
+    const visited = new Set<string>();
+    while (queue.size > 0) {
+      const id = queue.poll()!;
+      if (visited.has(id)) continue;
+      visited.add(id);
+      result.push(subdag.getNode(id));
+
+      for (const neighbor of subdag.getEdges(id, direction)) {
+        const weight = subdag.edgeWeights.get(id)?.get(neighbor) ?? 1;
+        const newWeight = Math.max(maxWeight.get(id)!, weight);
+        if (newWeight > (maxWeight.get(neighbor) ?? -Infinity)) {
+          maxWeight.set(neighbor, newWeight);
+        }
+
+        inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
+        if (inDegree.get(neighbor) === 0) queue.push(neighbor);
+      }
+    }
+
+    if (result.length !== subdag.size) {
+      throw new Error("Cycle detected in DAG");
+    }
+
+    return result;
+  }
+}
+
+export function getOrderStrategy<P, T extends Node<P>>(type: Order): OrderStrategy<P, T> {
+  switch (type) {
+    case 'topological':
+      return new TopoStrategy();
+    case 'shortest-path':
+      return new ShortestPathStrategy();
+    case 'priority':
+      return new PriorityStrategy();
+    case 'max-path-weight':
+      return new MaxPathWeightStrategy();
+    default:
+      return new TopoStrategy();
+  }
+}
+
 export class DAG<P, T extends Node<P>> {
   private static readonly EMPTY_SET = Object.freeze(new Set()) as Set<string>;
 
@@ -262,7 +486,7 @@ export class DAG<P, T extends Node<P>> {
   private readonly outReachs: Map<string, Set<string>> = new Map();
   private readonly inReachs: Map<string, Set<string>> = new Map();
 
-  private readonly edgeWeights: Map<string, Map<string, number>> = new Map();
+  public readonly edgeWeights: Map<string, Map<string, number>> = new Map();
 
   private readonly priorities: Map<string, number> = new Map();
 
@@ -275,25 +499,23 @@ export class DAG<P, T extends Node<P>> {
     return this.nodes.size;
   }
 
+  public addNode(node: string | T): this {
+    const n = this.toNode(node);
+    if (this.nodes.has(n.id)) return this;
+
+    this.nodes.set(n.id, n);
+    this.outEdges.set(n.id, new Set());
+    this.inEdges.set(n.id, new Set());
+    this.inDegree.set(n.id, 0);
+    this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
+    return this;
+  }
+
   public addNodes(...nodes: (string | T)[]): this {
     for (const node of nodes) this.addNode(node);
     return this;
   }
 
-  public addNode(node: string | T): this {
-    const n = this.toNode(node);
-    if (!this.nodes.has(n.id)) {
-      this.nodes.set(n.id, n);
-
-      this.outEdges.set(n.id, new Set());
-      this.inEdges.set(n.id, new Set());
-
-      this.inDegree.set(n.id, 0);
-
-      this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
-    }
-    return this;
-  }
 
   public addEdges(...edges: Edge<string | T>[]): this {
     for (const { source, target, weight = 1 } of edges) {
@@ -351,6 +573,7 @@ export class DAG<P, T extends Node<P>> {
     this.outEdges.delete(id);
     this.inDegree.delete(id);
     this.edgeWeights.delete(id);
+    this.priorities.delete(id);
 
     this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
     return this
@@ -395,8 +618,7 @@ export class DAG<P, T extends Node<P>> {
   }
 
   public setPriority(node: string | T, priority: number) {
-    const id = this.resolveId(node);
-    this.priorities.set(id, priority);
+    this.priorities.set(this.resolveId(node), priority);
     this.markDirty(Dirty.Topo);
   }
 
@@ -418,82 +640,33 @@ export class DAG<P, T extends Node<P>> {
 
   public order(
     node: string | T,
-    direction: Direction = Direction.Out
+    order: Order = 'topological',
+    direction: Direction = Direction.Out,
   ) {
-    const rootId = this.resolveId(node);
-    const key = this.createKey(rootId, direction);
+    const id = this.resolveId(node);
+    const key = this.createKey(id, direction);
     if (!this.isDirty(Dirty.Topo) && this.orders.has(key)) {
       return this.orders.get(key)!;
     }
 
     const subdag = this.subgraph(node, direction);
-
-    const inDegree = new Map<string, number>();
-    const distances = new Map<string, number>();
-
-    const reachable = subdag.getReachs(rootId, direction);
-    reachable.add(rootId);
-
-    for (const id of reachable) {
-      inDegree.set(id, subdag.getInEdges(id).size);
-      distances.set(id, id === rootId ? 0 : Infinity);
-    }
-
-    const queue = new PriorityQueue<string>((a, b) => {
-      const da = distances.get(a) ?? Infinity;
-      const db = distances.get(b) ?? Infinity;
-      const pa = this.priorities.get(a) ?? 0;
-      const pb = this.priorities.get(b) ?? 0;
-      return (da + pa) - (db + pb);
-    });
-
-    for (const [id, deg] of inDegree) {
-      if (deg === 0) queue.push(id);
-    }
-
-    const result: T[] = [];
-    const visited = new Set<string>();
-    while (queue.size > 0) {
-      const id = queue.poll()!;
-      if (visited.has(id)) continue;
-      visited.add(id);
-
-      result.push(subdag.getNode(id));
-
-      for (const neighbor of subdag.getEdges(id, direction)) {
-        if (!reachable.has(neighbor)) continue;
-
-        const weight = subdag.edgeWeights.get(id)?.get(neighbor) ?? 1;
-        const alt = distances.get(id)! + weight;
-        if (alt < (distances.get(neighbor) ?? Infinity)) {
-          distances.set(neighbor, alt);
-        }
-
-        inDegree.set(neighbor, inDegree.get(neighbor)! - 1);
-        if (inDegree.get(neighbor) === 0) {
-          queue.push(neighbor);
-        }
-      }
-    }
-
-    if (result.length !== subdag.size) {
-      throw new Error("Cycle detected in subgraph");
-    }
+    const strategy = getOrderStrategy<P, T>(order);
+    const result = strategy.sort(this, subdag, id, direction, this.priorities);
 
     this.orders.set(key, result);
     return result;
   }
 
   public subgraph(node: string | T, direction: Direction = Direction.Out) {
-    const rootId = this.resolveId(node);
-    if (!this.hasNode(rootId)) return new DAG<P, T>();
+    const id = this.resolveId(node);
+    if (!this.hasNode(id)) return new DAG<P, T>();
 
-    const key = this.createKey(rootId, direction);
+    const key = this.createKey(id, direction);
     if (!this.isDirty(Dirty.Reach) && this.subgraphs.has(key)) {
       return this.subgraphs.get(key)!;
     }
 
-    const subdag = this.slice(rootId, direction);
+    const subdag = this.slice(id, direction);
     this.subgraphs.set(key, subdag);
     return subdag;
   }
@@ -505,7 +678,6 @@ export class DAG<P, T extends Node<P>> {
   ): Set<string> {
     const visited = new Set<string>();
     const stack = [id];
-
     const edges = this.resolveEdges(direction);
 
     while (stack.length > 0) {
@@ -514,16 +686,10 @@ export class DAG<P, T extends Node<P>> {
       if (!this.hasNode(top) || visited.has(top)) continue;
 
       visited.add(top);
-
-      if (typeof callback === 'function') {
-        const stop = callback(top, id, this);
-        if (stop === false) break;
-      }
+      if (callback && callback(top, id, this) === false) break;
 
       for (const next of edges.get(top) ?? []) {
-        if (!visited.has(next)) {
-          stack.push(next);
-        }
+        if (!visited.has(next)) stack.push(next);
       }
     }
 
@@ -535,14 +701,11 @@ export class DAG<P, T extends Node<P>> {
     const edges = this.resolveEdges(direction);
 
     this.traverse(id, direction, (id) => {
-      const node = this.nodes.get(id)!;
-      subdag.addNode(node);
+      subdag.addNode(this.nodes.get(id)!);
 
       for (const neighbor of edges.get(id) ?? []) {
         const weight = this.edgeWeights.get(id)?.get(neighbor) ?? 1;
         subdag.addEdge(id, neighbor, weight);
-
-        subdag.inDegree.set(neighbor, (subdag.inDegree.get(neighbor) ?? 0) + 1);
       }
     });
 
@@ -569,6 +732,7 @@ export class DAG<P, T extends Node<P>> {
     if (this.isDirty(Dirty.Reach)) {
       this.inReachs.clear();
       this.outReachs.clear();
+      this.subgraphs.clear();
       this.clearDirty(Dirty.Reach);
     }
     return direction === Direction.Out ? this.outReachs : this.inReachs;
@@ -592,7 +756,7 @@ export class DAG<P, T extends Node<P>> {
     return (this.dirty & flag) !== 0;
   }
 
-  private clearDirty(flag: Dirty) {
+  private clearDirty(flag: Dirty): void {
     this.dirty &= ~flag;
   }
 }
@@ -623,9 +787,82 @@ export class StatefulNode<P = unknown> extends Node<P> {
 
   public onFinished() { }
 
-  public onReset(): void { }
+  public onReset(): void {
+    this.status = Status.Waiting;
+  }
 }
 
 export class StatefulDAG<P, T extends StatefulNode<P>> extends DAG<P, T> {
+  private readonly nodeVersions: Map<string, number> = new Map();
 
+  private paused: boolean = false;
+  private resumeResolvers: (() => void)[] = [];
+
+  public pause(): void {
+    this.paused = true;
+  }
+
+  public resume(run: boolean = false) {
+    if (!this.paused) return;
+    this.paused = false;
+    if (!run) {
+      for (const resolve of this.resumeResolvers) resolve();
+    }
+    this.resumeResolvers.length = 0;
+  }
+
+  public async execute(node: T, version: number, signal?: AbortSignal) {
+    if (this.shouldAbort(node.id, version, signal)) return;
+
+    try {
+      await Promise.resolve(node.onLoad());
+      if (this.shouldAbort(node.id, version, signal)) return;
+
+      node.status = Status.Success;
+      node.onSuccess?.();
+    } catch (error) {
+      if (this.shouldAbort(node.id, version, signal)) return;
+
+      node.status = Status.Failed;
+      node.onFailed?.();
+    } finally {
+      if (this.shouldAbort(node.id, version, signal)) return;
+
+      node.onFinished?.();
+    }
+  }
+
+  private _run(id: string, version?: number, signal?: AbortSignal) {
+
+  }
+
+  private async waitResume(): Promise<void> {
+    if (!this.paused) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      this.resumeResolvers.push(resolve);
+    });
+  }
+
+  private shouldAbort(id: string, version: number, signal?: AbortSignal): boolean {
+    const currentVersion = this.nodeVersions.get(id) ?? 0;
+    return version !== currentVersion || !!signal?.aborted;
+  }
 }
+
+
+
+const dag = new DAG()
+
+dag.addNodes('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J').addEdges(
+  { source: 'A', target: 'B' },
+  { source: 'A', target: 'C' },
+  { source: 'C', target: 'D' },
+  { source: 'A', target: 'E' },
+  { source: 'B', target: 'D' },
+  { source: 'D', target: 'G' },
+  { source: 'G', target: 'J' },
+  { source: 'E', target: 'F' },
+  { source: 'F', target: 'H', weight: 100 },
+)
+
+console.log(dag.order('A', 'max-path-weight'))
