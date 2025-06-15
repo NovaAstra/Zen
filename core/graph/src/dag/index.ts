@@ -1,13 +1,5 @@
 import { PriorityQueue } from "@zen-core/queue";
 
-export class Node<P = unknown> {
-  public _priority: number = 0
-
-  public constructor(
-    public readonly id: string,
-    public readonly metadata?: P
-  ) { }
-}
 
 export enum Dirty {
   None = 0,
@@ -29,10 +21,22 @@ export interface Edge<T> {
   weight?: number;
 }
 
-export class DAG<P, T extends Node<P>> {
+export type NodeFactory<T extends Node> = (id: string) => T;
+
+export class Node {
+  public _priority: number = 0
+
+  public constructor(
+    public readonly id: string
+  ) { }
+}
+
+export class DAG<T extends Node> {
   private static readonly EMPTY_SET = Object.freeze(new Set()) as Set<string>;
 
   private readonly nodes: Map<string, T> = new Map();
+
+  private readonly pendingEdges: Set<Edge<string>> = new Set();
 
   private readonly outEdges: Map<string, Set<string>> = new Map();
   private readonly inEdges: Map<string, Set<string>> = new Map();
@@ -45,7 +49,7 @@ export class DAG<P, T extends Node<P>> {
   public readonly edgeWeights: Map<string, Map<string, number>> = new Map();
 
   private readonly orders: Map<string, T[]> = new Map();
-  private readonly subgraphs: Map<string, DAG<P, T>> = new Map();
+  private readonly subgraphs: Map<string, DAG<T>> = new Map();
 
   private dirty: Dirty = Dirty.None;
 
@@ -53,15 +57,19 @@ export class DAG<P, T extends Node<P>> {
     return this.nodes.size;
   }
 
+  public constructor(private readonly nodeFactory: NodeFactory<T>) { }
+
   public addNode(node: string | T): this {
     const n = this.toNode(node);
-    if (this.nodes.has(n.id)) return this;
+    if (this.hasNode(n.id)) return this;
 
     this.nodes.set(n.id, n);
     this.outEdges.set(n.id, new Set());
     this.inEdges.set(n.id, new Set());
     this.inDegree.set(n.id, 0);
     this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
+
+    this.flushPendingEdges()
     return this;
   }
 
@@ -69,7 +77,6 @@ export class DAG<P, T extends Node<P>> {
     for (const node of nodes) this.addNode(node);
     return this;
   }
-
 
   public addEdges(...edges: Edge<string | T>[]): this {
     for (const { source, target, weight = 1 } of edges) {
@@ -81,7 +88,11 @@ export class DAG<P, T extends Node<P>> {
   public addEdge(source: string | T, target: string | T, weight: number = 1): this {
     const srcId = this.resolveId(source);
     const tgtId = this.resolveId(target);
-    this.addNodes(source, target);
+
+    if (!this.hasNode(srcId) || !this.hasNode(tgtId)) {
+      this.pendingEdges.add({ source: srcId, target: tgtId, weight });
+      return this;
+    }
 
     if (this.outEdges.get(srcId)!.has(tgtId)) return this;
 
@@ -195,7 +206,7 @@ export class DAG<P, T extends Node<P>> {
 
   public subgraph(node: string | T, direction: Direction = Direction.Out) {
     const id = this.resolveId(node);
-    if (!this.hasNode(id)) return new DAG<P, T>();
+    if (!this.hasNode(id)) return new DAG<T>(this.nodeFactory);
 
     const key = this.createKey(id, direction);
     if (!this.isDirty(Dirty.Reach) && this.subgraphs.has(key)) {
@@ -208,15 +219,15 @@ export class DAG<P, T extends Node<P>> {
   }
 
   public order(
-    node: string | T
+    node?: string | T
   ): T[] {
-    const id = this.resolveId(node);
+    const id = node ? this.resolveId(node) : 'root';
     const key = this.createKey(id, Direction.Out);
     if (!this.isDirty(Dirty.Topo) && this.orders.has(key)) {
       return this.orders.get(key)!;
     }
 
-    const subdag = this.subgraph(node, Direction.Out);
+    const subdag = node ? this.subgraph(node, Direction.Out) : this;
     const potential = subdag.potential();
 
     const inDegree = new Map(subdag.inDegree);
@@ -248,7 +259,7 @@ export class DAG<P, T extends Node<P>> {
   }
 
   protected resolveId(input: string | T): string {
-    return typeof input === 'string' ? input : input.id;
+    return typeof input === 'string' ? input : input?.id;
   }
 
   protected resolveEdges(direction: Direction): Map<string, Set<string>> {
@@ -265,6 +276,16 @@ export class DAG<P, T extends Node<P>> {
     return direction === Direction.Out ? this.outReachs : this.inReachs;
   }
 
+  private flushPendingEdges() {
+    for (const edge of this.pendingEdges) {
+      const { source, target, weight } = edge
+      if (this.hasNode(source) && this.hasNode(target)) {
+        this.addEdge(source, target, weight);
+        this.pendingEdges.delete(edge);
+      }
+    }
+  }
+
   private potential(): Map<string, number> {
     const memo = new Map<string, number>();
 
@@ -275,7 +296,7 @@ export class DAG<P, T extends Node<P>> {
 
       for (const next of this.getOutEdges(id)) {
         const weight = this.edgeWeights.get(id)?.get(next) ?? 1;
-        max = Math.max(max, weight, dfs(next, weight)  + 1);
+        max = Math.max(max, weight, dfs(next, weight) + 1);
       }
 
       memo.set(id, max);
@@ -292,7 +313,7 @@ export class DAG<P, T extends Node<P>> {
   private traverse(
     id: string,
     direction: Direction = Direction.Out,
-    callback?: (source: string, id: string, dag: DAG<P, T>) => boolean | void
+    callback?: (source: string, id: string, dag: DAG<T>) => boolean | void
   ): Set<string> {
     const visited = new Set<string>();
     const stack = [id];
@@ -314,8 +335,8 @@ export class DAG<P, T extends Node<P>> {
     return visited;
   }
 
-  private slice(id: string, direction: Direction): DAG<P, T> {
-    const subdag = new DAG<P, T>();
+  private slice(id: string, direction: Direction): DAG<T> {
+    const subdag = new DAG<T>(this.nodeFactory);
     const edges = this.resolveEdges(direction);
 
     this.traverse(id, direction, (id) => {
@@ -330,7 +351,7 @@ export class DAG<P, T extends Node<P>> {
   }
 
   private toNode(input: string | T): T {
-    return typeof input === 'string' ? new Node(input) as T : input
+    return typeof input === 'string' ? this.nodeFactory(input) : input
   }
 
   private createKey(id: string, direction: Direction) {

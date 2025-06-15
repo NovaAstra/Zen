@@ -16,7 +16,7 @@ const CHECK_FOR_WORK_INTERVAL = 100;
 const WORK_CALL_INTERVAL_LIMIT = 50;
 
 
-export class Component<P = unknown> extends Node<P> {
+export class Component<P = unknown> extends Node {
   public status: Status = Status.Waiting;
 
   public constructor(
@@ -24,7 +24,7 @@ export class Component<P = unknown> extends Node<P> {
     public priority: number = 0,
     public metadata?: P
   ) {
-    super(id, metadata)
+    super(id)
   }
 
   public onLoad() { }
@@ -35,8 +35,7 @@ export class Component<P = unknown> extends Node<P> {
 
   public onFinished() { }
 
-  public onReset(): void {
-    this.status = Status.Waiting;
+  public onReset() {
   }
 }
 
@@ -55,7 +54,7 @@ export class Worker<P, T extends Component<P>> {
   }
 }
 
-export class Scheduler<P, T extends Component<P>> extends DAG<P, T> {
+export class Scheduler<P, T extends Component<P>> extends DAG<T> {
   public readonly queue: PriorityQueue<T> = new PriorityQueue((a, b) => b._priority - a._priority)
 
   private workers: Worker<P, T>[] = [];
@@ -73,13 +72,26 @@ export class Scheduler<P, T extends Component<P>> extends DAG<P, T> {
 
   private paused: boolean = false;
 
-  public launch(){
-    this.checkForWorkInterval = setInterval(() => this.work(), CHECK_FOR_WORK_INTERVAL);
-  }
-
   public run(node: string | T) {
     const order = this.order(node);
     this.queue.push(...order);
+
+    this.work()
+  }
+
+  public updateWeight(node: T, weight: number = 0): this {
+    this.pause();
+
+    const tgtId = this.resolveId(node)
+    for (const srcId of this.getInEdges(node)) {
+      this.edgeWeights.get(srcId)!.set(tgtId, weight);
+    }
+    this.queue.clear()
+    const order = this.order();
+    this.queue.push(...order);
+
+    this.resume();
+    return this
   }
 
   public pause() {
