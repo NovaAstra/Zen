@@ -1,10 +1,18 @@
 <template>
-  <circle :cx="node.x" :cy="node.y" :r="15" :fill="fillColor" stroke="steelblue" stroke-width="2"
-    @click.capture="handleClick" style="cursor: pointer; pointer-events: all" />
+  <circle
+    :cx="node.x"
+    :cy="node.y"
+    :r="15"
+    :fill="fillColor"
+    stroke="steelblue"
+    stroke-width="2"
+    @click.capture="handleClick"
+    style="cursor: pointer; pointer-events: all"
+  />
 </template>
 
 <script>
-import { Status, PriorityNode } from "@zen-ui/headless";
+import { Status } from "@zen-ui/headless";
 
 export default {
   inject: ["root"],
@@ -17,9 +25,13 @@ export default {
   data() {
     return {
       status: 0,
+      _priority: 0,
     };
   },
   computed: {
+    id() {
+      return this.node.label;
+    },
     fillColor() {
       const status = this.status;
       switch (status) {
@@ -35,39 +47,14 @@ export default {
     },
   },
   created() {
-    const stateNode = new PriorityNode(this.node.label, this.node.label, null);
-
-    if (this.node.label === 'H' ||this.node.label === 'X') {
-      stateNode.priority = 100
-    }
-    if (this.node.label === 'T') {
-      stateNode.priority = 60
-    }
-
-    this.node._state = stateNode;
-
-    stateNode.onLoad = async (deps, node) => {
-      const a = await new Promise((r) => setTimeout(() => r(1231), 1000));
-      stateNode.data = a;
-    };
-    stateNode.onSuccess = (deps, node) => {
-      this.status = node.status;
-    };
-    stateNode.onFailed = (err, deps, node) => {
-      this.status = node.status;
-    };
-    stateNode.onFinished = (deps, node) => {
-      this.status = node.status;
-    };
-    stateNode.onReset = (node) => {
-      this.status = node.status;
-    };
-
-    this.root.dag.add(stateNode);
+    this.root.dag.addNode(this);
   },
   methods: {
     handleClick() {
       this.root.dag.run(this.node.label);
+    },
+    onLoad() {
+      return new Promise((resolve) => setTimeout(resolve, 500));
     },
   },
 };

@@ -5,7 +5,7 @@
       <button @click="restartFrom('A')">重置</button>
       <button @click="pauseDag">暂停</button>
       <button @click="resumeDag">恢复</button>
-      <button @click="dag.boostPriority('E',90)">提升E优先级</button>
+      <button @click="dag.boostPriority('E', 90)">提升E优先级</button>
     </div>
 
     <svg :width="width" :height="height" style="border: 1px solid #ccc">
@@ -13,10 +13,10 @@
       <line
         v-for="(edge, i) in edges"
         :key="'edge-' + i"
-        :x1="nodes[edge.from].x"
-        :y1="nodes[edge.from].y"
-        :x2="nodes[edge.to].x"
-        :y2="nodes[edge.to].y"
+        :x1="nodeMap.get(edge.source)?.x"
+        :y1="nodeMap.get(edge.source)?.y"
+        :x2="nodeMap.get(edge.target)?.x"
+        :y2="nodeMap.get(edge.target)?.y"
         stroke="black"
         stroke-width="2"
       />
@@ -101,48 +101,52 @@ export default {
       type: Array,
       default: () => [
         // A → B, C, D
-        { from: 0, to: 1 },
-        { from: 0, to: 2 },
-        { from: 0, to: 3 },
+        { source: "A", target: "B" },
+        { source: "A", target: "C" },
+        { source: "A", target: "D" },
 
         // B → H, J, K, L, Q
-        { from: 1, to: 4 },
-        { from: 1, to: 5 },
-        { from: 1, to: 6 },
-        { from: 1, to: 7 },
-        { from: 1, to: 8 },
+        { source: "B", target: "H" },
+        { source: "B", target: "J" },
+        { source: "B", target: "K" },
+        { source: "B", target: "L" },
+        { source: "B", target: "Q" },
 
         // C → Z, E, F, G, R, S, T, U
-        { from: 2, to: 9 },
-        { from: 2, to: 10 },
-        { from: 2, to: 11 },
-        { from: 2, to: 12 },
-        { from: 2, to: 13 },
-        { from: 2, to: 14 },
-        { from: 2, to: 15 },
-        { from: 2, to: 16 },
+        { source: "C", target: "Z" },
+        { source: "C", target: "E" },
+        { source: "C", target: "F" },
+        { source: "C", target: "G" },
+        { source: "C", target: "R" },
+        { source: "C", target: "S" },
+        { source: "C", target: "T" },
+        { source: "C", target: "U" },
 
         // D → M, N, P, V, W, X
-        { from: 3, to: 17 },
-        { from: 3, to: 18 },
-        { from: 3, to: 19 },
-        { from: 3, to: 20 },
-        { from: 3, to: 21 },
-        { from: 3, to: 22 },
+        { source: "D", target: "M" },
+        { source: "D", target: "N" },
+        { source: "D", target: "P" },
+        { source: "D", target: "V" },
+        { source: "D", target: "W" },
+        { source: "D", target: "X" },
       ],
     },
   },
   data() {
     return {
-      dag: new Scheduler({ maxConcurrency: 2, useIdle: true }),
+      dag: new Scheduler(),
     };
   },
+  computed: {
+    nodeMap() {
+      const map = new Map();
+      this.nodes.forEach((node) => map.set(node.label, node));
+      return map;
+    },
+  },
   mounted() {
-    for (const edge of this.edges) {
-      const from = this.nodes[edge.from].label;
-      const to = this.nodes[edge.to].label;
-      this.dag.link(to, from);
-    }
+    this.dag.launch()
+    this.dag.addEdges(...this.edges);
   },
   methods: {
     runFrom(label) {

@@ -36,6 +36,10 @@ export class PriorityQueue<T> {
   public peek(): T {
     return this.heap.peek()!;
   }
+  
+  public rebuild(): void {
+    return this.heap.rebuild();
+  }
 
   public clear(): void {
     this.heap.clear();
