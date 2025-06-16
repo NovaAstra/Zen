@@ -54,7 +54,7 @@ export default {
       this.root.dag.run(this.node.label);
     },
     onLoad() {
-      return new Promise((resolve) => setTimeout(resolve, 500));
+      return new Promise((resolve) => setTimeout(resolve, 1000));
     },
   },
 };

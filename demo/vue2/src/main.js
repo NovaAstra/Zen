@@ -1,13 +1,11 @@
 import Vue from 'vue'
 import App from './App.vue'
-import A from './A/index.vue'
-import Dag from './Dag/index.vue'
+import Scheduler from './Scheduler/index.vue'
 import VueRouter from 'vue-router'
 Vue.use(VueRouter)
 
 const routes = [
-  { path: '/foo', component: A },
-  { path: '/bar', component: Dag }
+  { path: '/scheduler', component: Scheduler }
 ]
 const router = new VueRouter({
   routes

@@ -34,7 +34,7 @@ export class Node {
 export class DAG<T extends Node> {
   private static readonly EMPTY_SET = Object.freeze(new Set()) as Set<string>;
 
-  private readonly nodes: Map<string, T> = new Map();
+  public readonly nodes: Map<string, T> = new Map();
 
   private readonly pendingEdges: Set<Edge<string>> = new Set();
 
@@ -57,7 +57,7 @@ export class DAG<T extends Node> {
     return this.nodes.size;
   }
 
-  public constructor(private readonly nodeFactory: NodeFactory<T>) { }
+  public constructor(private readonly factory: (typeof Node)) { }
 
   public addNode(node: string | T): this {
     const n = this.toNode(node);
@@ -206,7 +206,7 @@ export class DAG<T extends Node> {
 
   public subgraph(node: string | T, direction: Direction = Direction.Out) {
     const id = this.resolveId(node);
-    if (!this.hasNode(id)) return new DAG<T>(this.nodeFactory);
+    if (!this.hasNode(id)) return new DAG<T>(this.factory);
 
     const key = this.createKey(id, direction);
     if (!this.isDirty(Dirty.Reach) && this.subgraphs.has(key)) {
@@ -276,8 +276,30 @@ export class DAG<T extends Node> {
     return direction === Direction.Out ? this.outReachs : this.inReachs;
   }
 
+  protected markDirty(flags: Dirty) {
+    this.dirty |= flags;
+
+    if (flags & Dirty.Reach) {
+      this.inReachs.clear();
+      this.outReachs.clear();
+      this.subgraphs.clear();
+    }
+
+    if (flags & Dirty.Topo) {
+      this.orders.clear();
+    }
+  }
+
+  protected isDirty(flag: Dirty): boolean {
+    return (this.dirty & flag) !== 0;
+  }
+
+  protected clearDirty(flag: Dirty): void {
+    this.dirty &= ~flag;
+  }
+
   private flushPendingEdges() {
-    for (const edge of this.pendingEdges) {
+    for (const edge of Array.from(this.pendingEdges)) {
       const { source, target, weight } = edge
       if (this.hasNode(source) && this.hasNode(target)) {
         this.addEdge(source, target, weight);
@@ -336,7 +358,7 @@ export class DAG<T extends Node> {
   }
 
   private slice(id: string, direction: Direction): DAG<T> {
-    const subdag = new DAG<T>(this.nodeFactory);
+    const subdag = new DAG<T>(this.factory);
     const edges = this.resolveEdges(direction);
 
     this.traverse(id, direction, (id) => {
@@ -351,33 +373,10 @@ export class DAG<T extends Node> {
   }
 
   private toNode(input: string | T): T {
-    return typeof input === 'string' ? this.nodeFactory(input) : input
+    return typeof input === 'string' ? new this.factory(input) as T : input
   }
 
   private createKey(id: string, direction: Direction) {
     return `${direction}:${id}`;
-  }
-
-
-  private markDirty(flags: Dirty) {
-    this.dirty |= flags;
-
-    if (flags & Dirty.Reach) {
-      this.inReachs.clear();
-      this.outReachs.clear();
-      this.subgraphs.clear();
-    }
-
-    if (flags & Dirty.Topo) {
-      this.orders.clear();
-    }
-  }
-
-  private isDirty(flag: Dirty): boolean {
-    return (this.dirty & flag) !== 0;
-  }
-
-  private clearDirty(flag: Dirty): void {
-    this.dirty &= ~flag;
   }
 }
