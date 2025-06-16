@@ -67,6 +67,8 @@ export class Scheduler<P, T extends Component<P>> extends DAG<T> {
   private workersBusy: Set<Worker<P, T>> = new Set();
   private workersStarting = 0;
 
+  private readonly mountedNodes: WeakMap<HTMLElement, T> = new Map()
+
   private nextWorkCall: number = 0;
   private workCallTimeout: number | null = null;
   private checkForWorkInterval: number | null = null;
@@ -76,6 +78,10 @@ export class Scheduler<P, T extends Component<P>> extends DAG<T> {
   private closed: boolean = false;
 
   private paused: boolean = false;
+
+  private readonly observer: IntersectionObserver = new IntersectionObserver((entries) => {
+
+  })
 
   public constructor() {
     super(Component)
@@ -181,6 +187,16 @@ export class Scheduler<P, T extends Component<P>> extends DAG<T> {
     if (!this.paused) return;
     this.paused = false;
     this.work();
+  }
+
+  public observe(element: HTMLElement, node: T) {
+    this.mountedNodes.set(element, node)
+    this.observer.observe(element)
+  }
+
+  public unobserve(element: HTMLElement) {
+    this.mountedNodes.delete(element)
+    this.observer.unobserve(element)
   }
 
   private async work(node?: T): Promise<void> {

@@ -1,11 +1,13 @@
 <template>
-  <div>
-    <router-link to="/scheduler">状态依赖演示</router-link>
-
-    <router-view></router-view>
-  </div>
+  <Dashboard />
 </template>
 
 <script>
-export default {};
+import Dashboard from "./Dashboard/index.vue";
+
+export default {
+  components: {
+    Dashboard,
+  },
+};
 </script>
