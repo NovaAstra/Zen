@@ -8,6 +8,7 @@
 
 <script>
 export default {
+  inject: ["root"],
   data() {
     return {
       visible: false,
@@ -15,10 +16,10 @@ export default {
     };
   },
   mounted() {
-    this.scheduler.observe(this.$el, this);
+    this.root.scheduler.observe(this.$el, this);
   },
   beforeDestory() {
-    this.scheduler.unobserve(this.$el);
+    this.root.scheduler.unobserve(this.$el);
   },
   methods: {
     fetchData() {
@@ -39,5 +40,6 @@ export default {
 .widget {
   width: 100%;
   height: 100%;
+  border: 1px solid red;
 }
 </style>

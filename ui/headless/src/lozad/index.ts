@@ -1,3 +1,4 @@
+import { maxBy } from "lodash-es"
 import { type Edge, DAG, Dirty, Node } from "@zen-core/graph"
 import { PriorityQueue } from "@zen-core/queue"
 
@@ -6,8 +7,11 @@ export interface Schema<T extends Node> {
   edges: Edge<string>[]
 }
 
-export interface MetaData {
-
+export interface Options {
+  lazy: boolean;
+  idleDispatchDelay: number;
+  maxConcurrency: number;
+  intersectionObserverInit: IntersectionObserverInit;
 }
 
 export enum Status {
@@ -17,17 +21,24 @@ export enum Status {
   Failed
 }
 
-const CHECK_FOR_WORK_INTERVAL = 100;
 const WORK_CALL_INTERVAL_LIMIT = 50;
 
+const DEFAULT_OPTIONS: Options = {
+  lazy: true,
+  maxConcurrency: 1,
+  idleDispatchDelay: 50,
+  intersectionObserverInit: {
+    rootMargin: '200px',
+    threshold: 0.1,
+  }
+}
 
-export class Component<P = unknown> extends Node {
+export class Component extends Node {
   public status: Status = Status.Waiting;
 
   public constructor(
     public readonly id: string,
-    public priority: number = 0,
-    public metadata?: P
+    public priority: number = 0
   ) {
     super(id)
   }
@@ -44,7 +55,9 @@ export class Component<P = unknown> extends Node {
   }
 }
 
-export class Worker<P, T extends Component<P>> {
+export class Worker<T extends Component> {
+  public constructor(public readonly scheduler: Scheduler<T>) { }
+
   public async handle(node: T) {
     try {
       await Promise.resolve(node.onLoad());
@@ -59,15 +72,17 @@ export class Worker<P, T extends Component<P>> {
   }
 }
 
-export class Scheduler<P, T extends Component<P>> extends DAG<T> {
+export class Scheduler<T extends Component> extends DAG<T> {
   public readonly queue: PriorityQueue<T> = new PriorityQueue(((a, b) => b._priority - a._priority), false)
 
-  private workers: Worker<P, T>[] = [];
-  private workersAvail: Worker<P, T>[] = [];
-  private workersBusy: Set<Worker<P, T>> = new Set();
+  public readonly options: Options
+
+  private workers: Worker<T>[] = [];
+  private workersAvail: Worker<T>[] = [];
+  private workersBusy: Set<Worker<T>> = new Set();
   private workersStarting = 0;
 
-  private readonly mountedNodes: WeakMap<HTMLElement, T> = new Map()
+  private runningEdges: number = 0
 
   private nextWorkCall: number = 0;
   private workCallTimeout: number | null = null;
@@ -79,12 +94,33 @@ export class Scheduler<P, T extends Component<P>> extends DAG<T> {
 
   private paused: boolean = false;
 
-  private readonly observer: IntersectionObserver = new IntersectionObserver((entries) => {
-    for (const { target, isIntersecting } of entries) { }
-  })
+  private mountedNodes: WeakMap<Element, T> = new WeakMap()
+  private inViewportNodes: WeakSet<Element> = new WeakSet()
+  private pendingWeightUpdates: Map<T, number> = new Map();
+  private weightUpdateScheduled: boolean = false
+  private observer: IntersectionObserver;
 
-  public constructor() {
-    super(Component)
+  public constructor(options: Partial<Options> = {}) {
+    super()
+    this.options = Object.assign({}, DEFAULT_OPTIONS, options)
+    this.observer = new IntersectionObserver((entries) => {
+      for (const { target, isIntersecting } of entries) {
+        const node = this.mountedNodes.get(target);
+        if (!node) continue;
+
+        if (isIntersecting) {
+          if (!this.inViewportNodes.has(target)) {
+            this.inViewportNodes.add(target);
+            this.batchUpdateWeight(node, 3);
+          } else {
+            if (this.inViewportNodes.has(target)) {
+              this.inViewportNodes.delete(target);
+              this.batchUpdateWeight(node, 1);
+            }
+          }
+        }
+      }
+    }, this.options.intersectionObserverInit)
   }
 
   public launch() {
@@ -190,13 +226,46 @@ export class Scheduler<P, T extends Component<P>> extends DAG<T> {
   }
 
   public observe(element: HTMLElement, node: T) {
+    this.addNode(node);
     this.mountedNodes.set(element, node)
     this.observer.observe(element)
   }
 
   public unobserve(element: HTMLElement) {
+    const node = this.mountedNodes.get(element)!
+    this.removeNode(node)
     this.mountedNodes.delete(element)
     this.observer.unobserve(element)
+  }
+
+  private batchUpdateWeight(node: T, weight: number) {
+    const existing = this.pendingWeightUpdates.get(node);
+    if (existing === weight) return;
+
+    this.pendingWeightUpdates.set(node, weight);
+
+    if (this.weightUpdateScheduled) return;
+    this.weightUpdateScheduled = true;
+
+    requestIdleCallback(() => {
+      this.pause();
+
+      for (const [node, weight] of this.pendingWeightUpdates) {
+        const tgtId = this.resolveId(node)
+        for (const srcId of this.getInEdges(node)) {
+          this.edgeWeights.get(srcId)?.set(tgtId, weight);
+        }
+      }
+
+      this.pendingWeightUpdates.clear();
+      this.markDirty(Dirty.Topo | Dirty.Reach);
+
+      this.order();
+      this.queue.rebuild();
+      this.resume();
+
+      this.weightUpdateScheduled = false;
+    });
   }
 
   private async work(node?: T): Promise<void> {
@@ -214,47 +283,50 @@ export class Scheduler<P, T extends Component<P>> extends DAG<T> {
       this.workCallTimeout = setTimeout(
         () => {
           this.workCallTimeout = null;
-          this.doWork(node);
+          this.doWork();
         },
         timeUntilNextWorkCall,
       );
     }
   }
 
-  private async doWork(node?: T) {
-    if (this.queue.size === 0 && !node) {
+  private async doWork(parent?: T, node?: T) {
+    if (this.queue.size === 0) {
       if (this.workersBusy.size === 0) { }
       return;
     }
 
-    if (this.workersAvail.length === 0 && !node) {
-      const next = this.queue.peek();
-      if (this.allowedToStartWorker(next)) {
-        await this.launchWorker();
-        this.work();
-      }
-      return;
-    }
-
-    node = node ?? this.queue.poll();
+    node = node ?? this.queue.peek();
     if (!node) {
       // skip, there are items in the queue but they are all delayed
       return;
     }
 
     if (this.workersAvail.length === 0) {
-      if (this.allowedToStartWorker(node)) {
+      if (this.allowedToStartWorker()) {
         await this.launchWorker();
-        this.work(node);
+        this.work();
       }
       return;
     }
 
-    const worker = this.workersAvail.shift() as Worker<P, T>;
+    node = this.queue.poll()
+    const worker = this.workersAvail.shift() as Worker<T>;
     this.workersBusy.add(worker);
 
-    if (this.workersAvail.length !== 0 || this.allowedToStartWorker(node)) {
-      this.work();
+    if (this.workersAvail.length !== 0 || this.allowedToStartWorker()) {
+      if (parent) {
+        const edges = this.getOutEdges(parent)
+        const allowNode = maxBy(
+          Array.from(edges).filter(edge => edge !== node.id)
+            .map(this.getNode), (node: T) => node._priority
+        )
+        if (allowNode && this.runningEdges < this.options.maxConcurrency) {
+          this.runningEdges++
+          this.queue.remove(allowNode)
+          this.work(parent, allowNode);
+        }
+      }
     }
 
     await worker.handle(node);
@@ -268,15 +340,17 @@ export class Scheduler<P, T extends Component<P>> extends DAG<T> {
   private launchWorker() {
     this.workersStarting += 1;
 
-    const worker = new Worker<P, T>();
+    const worker = new Worker<T>(this);
     this.workers.push(worker);
     this.workersAvail.push(worker);
+
     this.workersStarting -= 1;
 
   }
 
-  private allowedToStartWorker(node: T): boolean {
+  private allowedToStartWorker(): boolean {
     const workerCount = this.workers.length + this.workersStarting;
-    return workerCount < 1
+    return (this.options.maxConcurrency === 0
+      || workerCount < this.options.maxConcurrency)
   }
 }

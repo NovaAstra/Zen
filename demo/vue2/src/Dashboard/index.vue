@@ -28,9 +28,15 @@
 
 <script>
 import VueGridLayout from "vue-grid-layout";
+import { Scheduler } from "@zen-ui/headless";
 import Widget from "./Widget.vue";
 
 export default {
+  provide() {
+    return {
+      root: this,
+    };
+  },
   components: {
     GridLayout: VueGridLayout.GridLayout,
     GridItem: VueGridLayout.GridItem,
@@ -512,6 +518,7 @@ export default {
           integrationCode: ["TEAMS"],
         },
       ],
+      scheduler: new Scheduler(),
     };
   },
 };

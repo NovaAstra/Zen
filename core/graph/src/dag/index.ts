@@ -57,7 +57,7 @@ export class DAG<T extends Node> {
     return this.nodes.size;
   }
 
-  public constructor(private readonly factory: (typeof Node)) { }
+  public constructor() { }
 
   public addNode(node: string | T): this {
     const n = this.toNode(node);
@@ -206,7 +206,7 @@ export class DAG<T extends Node> {
 
   public subgraph(node: string | T, direction: Direction = Direction.Out) {
     const id = this.resolveId(node);
-    if (!this.hasNode(id)) return new DAG<T>(this.factory);
+    if (!this.hasNode(id)) return new DAG<T>();
 
     const key = this.createKey(id, direction);
     if (!this.isDirty(Dirty.Reach) && this.subgraphs.has(key)) {
@@ -237,8 +237,11 @@ export class DAG<T extends Node> {
       (a, b) => potential.get(b)! - potential.get(a)!
     );
 
-    for (const [nid, deg] of inDegree.entries()) {
-      if (deg === 0) queue.push(nid);
+
+    for (const [nid, deg] of inDegree) {
+      if (deg === 0) {
+        queue.push(nid)
+      };
     }
 
     while (queue.size > 0) {
@@ -249,6 +252,7 @@ export class DAG<T extends Node> {
 
       for (const next of subdag.getOutEdges(nid)) {
         inDegree.set(next, inDegree.get(next)! - 1);
+
         if (inDegree.get(next) === 0) queue.push(next);
       }
     }
@@ -358,7 +362,7 @@ export class DAG<T extends Node> {
   }
 
   private slice(id: string, direction: Direction): DAG<T> {
-    const subdag = new DAG<T>(this.factory);
+    const subdag = new DAG<T>();
     const edges = this.resolveEdges(direction);
 
     this.traverse(id, direction, (id) => {
@@ -373,7 +377,7 @@ export class DAG<T extends Node> {
   }
 
   private toNode(input: string | T): T {
-    return typeof input === 'string' ? new this.factory(input) as T : input
+    return typeof input === 'string' ? new Node(input) as T : input
   }
 
   private createKey(id: string, direction: Direction) {
