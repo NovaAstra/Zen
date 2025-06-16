@@ -1,6 +1,8 @@
 <template>
   <div class="widget">
     <div v-if="visible">可见</div>
+
+    <div v-if="loading">Loading</div>
   </div>
 </template>
 
@@ -11,6 +13,24 @@ export default {
       visible: false,
       loading: false,
     };
+  },
+  mounted() {
+    this.scheduler.observe(this.$el, this);
+  },
+  beforeDestory() {
+    this.scheduler.unobserve(this.$el);
+  },
+  methods: {
+    fetchData() {
+      this.visible = true;
+      this.loading = true;
+      return new Promise((resove) => {
+        setTimeout(() => {
+          this.loading = false;
+          resove();
+        }, 2000);
+      });
+    },
   },
 };
 </script>

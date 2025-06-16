@@ -80,7 +80,7 @@ export class Scheduler<P, T extends Component<P>> extends DAG<T> {
   private paused: boolean = false;
 
   private readonly observer: IntersectionObserver = new IntersectionObserver((entries) => {
-
+    for (const { target, isIntersecting } of entries) { }
   })
 
   public constructor() {
