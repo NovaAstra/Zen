@@ -447,7 +447,7 @@ export interface Node {
 const DEFAULT_OPTIONS: Options = {
   settleTime: 100,
   intersectionObserverInit: {
-    threshold: 0,
+    threshold: 0.1,
   }
 }
 
@@ -524,7 +524,7 @@ export class Scheduler<T extends Node> extends DAG<any> {
     this.scroller.dispose()
   }
 
-  private onUpdate = throttle(this._onUpdate.bind(this), 130, { leading: false });
+  private onUpdate = this._onUpdate.bind(this);
   private onScrollStart = this._onScrollStart.bind(this);
   private onScrollEnd = this._onScrollEnd.bind(this);
   private onVisible = this._onVisible.bind(this)
@@ -583,7 +583,7 @@ export class Scheduler<T extends Node> extends DAG<any> {
       updated.push([target, 1, false])
       this.seen.delete(target)
     }
-    console.log(updated)
+
     this.updated = updated
     this.onUpdate()
   }
