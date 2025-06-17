@@ -1,6 +1,5 @@
 import { PriorityQueue } from "@zen-core/queue";
 
-
 export enum Dirty {
   None = 0,
   Topo = 1 << 0,
@@ -17,18 +16,17 @@ export type Comparator<T> = (a: T, b: T) => number;
 
 export interface Edge<T> {
   source: T,
-  target: T,
-  weight?: number;
+  target: T
 }
 
 export type NodeFactory<T extends Node> = (id: string) => T;
 
-export class Node {
-  public _priority: number = 0
+export interface Node {
+  priority?: number;
+  readonly id: string;
 
-  public constructor(
-    public readonly id: string
-  ) { }
+  _priority?: number;
+  _level?: number;
 }
 
 export class DAG<T extends Node> {
@@ -46,8 +44,6 @@ export class DAG<T extends Node> {
   private readonly outReachs: Map<string, Set<string>> = new Map();
   private readonly inReachs: Map<string, Set<string>> = new Map();
 
-  public readonly edgeWeights: Map<string, Map<string, number>> = new Map();
-
   private readonly orders: Map<string, T[]> = new Map();
   private readonly subgraphs: Map<string, DAG<T>> = new Map();
 
@@ -57,40 +53,50 @@ export class DAG<T extends Node> {
     return this.nodes.size;
   }
 
-  public constructor() { }
-
-  public addNode(node: string | T): this {
-    const n = this.toNode(node);
-    if (this.hasNode(n.id)) return this;
-
-    this.nodes.set(n.id, n);
-    this.outEdges.set(n.id, new Set());
-    this.inEdges.set(n.id, new Set());
-    this.inDegree.set(n.id, 0);
+  public addNode(node: T): this {
+    this._addNode(node);
     this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
-
     this.flushPendingEdges()
     return this;
   }
 
-  public addNodes(...nodes: (string | T)[]): this {
-    for (const node of nodes) this.addNode(node);
+  public addNodes(nodes: T[]): this {
+    for (const node of nodes) this._addNode(node);
+    this.flushPendingEdges()
+    this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
     return this;
   }
 
-  public addEdges(...edges: Edge<string | T>[]): this {
-    for (const { source, target, weight = 1 } of edges) {
-      this.addEdge(source, target, weight);
+  private _addNode(node: T) {
+    const id = this.resolveId(node)
+
+    if (this.hasNode(id)) return this;
+
+    this.nodes.set(id, node);
+    this.outEdges.set(id, new Set());
+    this.inEdges.set(id, new Set());
+    this.inDegree.set(id, 0);
+  }
+
+  public addEdge(source: string | T, target: string | T): this {
+    this._addEdge(source, target)
+    this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
+    return this;
+  }
+
+  public addEdges(edges: Edge<string | T>[]): this {
+    for (const { source, target } of edges) {
+      this._addEdge(source, target);
     }
+    this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
     return this;
   }
 
-  public addEdge(source: string | T, target: string | T, weight: number = 1): this {
-    const srcId = this.resolveId(source);
-    const tgtId = this.resolveId(target);
-
+  private _addEdge(source: string | T, target: string | T) {
+    const srcId = this.resolveId(source)
+    const tgtId = this.resolveId(target)
     if (!this.hasNode(srcId) || !this.hasNode(tgtId)) {
-      this.pendingEdges.add({ source: srcId, target: tgtId, weight });
+      this.pendingEdges.add({ source: srcId, target: tgtId });
       return this;
     }
 
@@ -104,32 +110,32 @@ export class DAG<T extends Node> {
     this.inEdges.get(tgtId)!.add(srcId);
 
     this.inDegree.set(tgtId, (this.inDegree.get(tgtId) ?? 0) + 1);
+    return this
+  }
 
-    if (!this.edgeWeights.has(srcId)) this.edgeWeights.set(srcId, new Map());
-    this.edgeWeights.get(srcId)!.set(tgtId, weight);
-
+  public removeNodes(nodes: (string | T)[]): this {
+    for (const node of nodes) this._removeNode(node);
     this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
     return this;
   }
 
-  public removeNodes(...nodes: (string | T)[]): this {
-    for (const node of nodes) this.removeNode(node);
-    return this;
+  public removeNode(node: string | T): this {
+    this._removeNode(node);
+    this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
+    return this
   }
 
-  public removeNode(node: string | T): this {
-    const id = this.resolveId(node);
-    if (!this.nodes.has(id)) return this;
+  private _removeNode(node: string | T) {
+    const id = this.resolveId(node)
+    if (!this.hasNode(id)) return this;
 
     for (const target of this.outEdges.get(id) ?? []) {
       this.inEdges.get(target)?.delete(id);
       this.inDegree.set(target, (this.inDegree.get(target) ?? 1) - 1);
-      this.edgeWeights.get(id)?.delete(target);
     }
 
     for (const source of this.inEdges.get(id) ?? []) {
       this.outEdges.get(source)?.delete(id);
-      this.edgeWeights.get(source)?.delete(id);
       this.inDegree.set(id, (this.inDegree.get(id) ?? 1) - 1);
     }
 
@@ -137,36 +143,39 @@ export class DAG<T extends Node> {
     this.inEdges.delete(id);
     this.outEdges.delete(id);
     this.inDegree.delete(id);
-    this.edgeWeights.delete(id);
+  }
 
+  public removeEdges(edges: Edge<string | T>[]): this {
+    for (const { source, target } of edges) {
+      const srcId = this.resolveId(source)
+      const tgtId = this.resolveId(target)
+      this._removeEdge(srcId, tgtId)
+    };
     this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
     return this
   }
 
-  public removeEdges(...edges: Edge<string | T>[]): this {
-    for (const { source, target } of edges) this.removeEdge(source, target);
-    return this
-  }
-
   public removeEdge(source: string | T, target: string | T): this {
-    const srcId = this.resolveId(source);
-    const tgtId = this.resolveId(target);
-
-    if (this.outEdges.get(srcId)?.delete(tgtId)) {
-      this.inEdges.get(tgtId)?.delete(srcId);
-      this.inDegree.set(tgtId, this.inDegree.get(tgtId)! - 1);
-      this.edgeWeights.get(srcId)?.delete(tgtId);
-      this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
-    }
+    const srcId = this.resolveId(source)
+    const tgtId = this.resolveId(target)
+    this._removeEdge(srcId, tgtId)
+    this.markDirty(Dirty.Topo | Dirty.Cycle | Dirty.Reach);
     return this;
   }
 
-  public getNode(node: string | T): T {
-    return this.nodes.get(this.resolveId(node))!;
+  private _removeEdge(srcId: string, tgtId: string) {
+    if (this.outEdges.get(srcId)?.delete(tgtId)) {
+      this.inEdges.get(tgtId)?.delete(srcId);
+      this.inDegree.set(tgtId, this.inDegree.get(tgtId)! - 1);
+    }
   }
 
-  public hasNode(node: string | T): boolean {
-    return this.nodes.has(this.resolveId(node));
+  public getNode(id: string): T {
+    return this.nodes.get(id)!;
+  }
+
+  public hasNode(id: string): boolean {
+    return this.nodes.has(id);
   }
 
   public getOutEdges(node: string | T): ReadonlySet<string> {
@@ -234,31 +243,36 @@ export class DAG<T extends Node> {
     const result: T[] = [];
 
     const queue = new PriorityQueue<string>(
-      (a, b) => potential.get(b)! - potential.get(a)!
+      (a, b) => {
+        const [pa, la] = potential.get(a)!;
+        const [pb, lb] = potential.get(b)!;
+
+        if (pa !== pb) return pb - pa;
+        return la - lb;
+      }
     );
 
 
     for (const [nid, deg] of inDegree) {
-      if (deg === 0) {
-        queue.push(nid)
-      };
+      if (deg === 0) queue.push(nid)
     }
 
     while (queue.size > 0) {
       const nid = queue.poll();
       const node = subdag.getNode(nid)
-      node._priority = potential.get(nid)!
+      const [priority, level] = potential.get(nid)!
+      node._priority = priority
+      node._level = level
       result.push(node);
 
       for (const next of subdag.getOutEdges(nid)) {
         inDegree.set(next, inDegree.get(next)! - 1);
-
         if (inDegree.get(next) === 0) queue.push(next);
       }
     }
 
-
     this.orders.set(key, result);
+    this.clearDirty(Dirty.Topo);
     return result;
   }
 
@@ -304,33 +318,36 @@ export class DAG<T extends Node> {
 
   private flushPendingEdges() {
     for (const edge of Array.from(this.pendingEdges)) {
-      const { source, target, weight } = edge
+      const { source, target } = edge
       if (this.hasNode(source) && this.hasNode(target)) {
-        this.addEdge(source, target, weight);
+        this.addEdge(source, target);
         this.pendingEdges.delete(edge);
       }
     }
   }
 
-  private potential(): Map<string, number> {
-    const memo = new Map<string, number>();
+  private potential(): Map<string, [number, number]> {
+    const memo = new Map<string, [number, number]>();
 
-    const dfs = (id: string, weight: number = 0): number => {
+    const dfs = (id: string, level: number): [number, number] => {
       if (memo.has(id)) return memo.get(id)!;
 
-      let max = weight;
+      const node = this.getNode(id);
+      let max = node?.priority ?? 1;
 
+      const l = level + 1
       for (const next of this.getOutEdges(id)) {
-        const weight = this.edgeWeights.get(id)?.get(next) ?? 1;
-        max = Math.max(max, weight, dfs(next, weight) + 1);
+        if (!this.hasNode(next)) continue;
+        const p = this.getNode(next).priority ?? 1;
+        max = Math.max(max, dfs(next, l)[0], p);
       }
 
-      memo.set(id, max);
-      return max;
+      memo.set(id, [max, level]);
+      return [max, level];
     };
 
     for (const id of this.nodes.keys()) {
-      dfs(id);
+      if (!memo.has(id)) dfs(id, 0);
     }
 
     return memo;
@@ -369,18 +386,14 @@ export class DAG<T extends Node> {
       subdag.addNode(this.nodes.get(id)!);
 
       for (const neighbor of edges.get(id) ?? []) {
-        const weight = this.edgeWeights.get(id)?.get(neighbor) ?? 1;
-        subdag.addEdge(this.nodes.get(id)!, this.nodes.get(neighbor)!, weight);
+        subdag.addEdge(this.nodes.get(id)!, this.nodes.get(neighbor)!);
       }
     });
     return subdag;
-  }
-
-  private toNode(input: string | T): T {
-    return typeof input === 'string' ? new Node(input) as T : input
   }
 
   private createKey(id: string, direction: Direction) {
     return `${direction}:${id}`;
   }
 }
+

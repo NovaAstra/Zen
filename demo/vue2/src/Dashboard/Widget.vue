@@ -1,8 +1,8 @@
 <template>
   <div class="widget">
     <div v-if="visible">可见</div>
-
     <div v-if="loading">Loading</div>
+    <slot />
   </div>
 </template>
 
@@ -13,6 +13,7 @@ export default {
     return {
       visible: false,
       loading: false,
+      priority: 1,
     };
   },
   mounted() {
@@ -23,11 +24,8 @@ export default {
   },
   methods: {
     fetchData() {
-      this.visible = true;
-      this.loading = true;
       return new Promise((resove) => {
         setTimeout(() => {
-          this.loading = false;
           resove();
         }, 2000);
       });

@@ -83,6 +83,9 @@ importers:
 
   demo/vue3:
     dependencies:
+      '@zen-core/graph':
+        specifier: workspace:*
+        version: link:../../core/graph
       vue:
         specifier: ^3.5.13
         version: 3.5.16(typescript@5.8.3)
@@ -105,9 +108,6 @@ importers:
 
   ui/headless:
     dependencies:
-      '@types/lodash':
-        specifier: ^4.17.17
-        version: 4.17.17
       '@zen-core/graph':
         specifier: workspace:*
         version: link:../../core/graph

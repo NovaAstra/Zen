@@ -20,7 +20,9 @@
         :i="item.i"
         :key="item.i"
       >
-        <Widget />
+        <Widget >
+            {{item.i}}
+        </Widget>
       </grid-item>
     </grid-layout>
   </div>
