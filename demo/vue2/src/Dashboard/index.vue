@@ -20,9 +20,7 @@
         :i="item.i"
         :key="item.i"
       >
-        <Widget >
-            {{item.i}}
-        </Widget>
+        <Widget :id="item.i" :name="item.name" :priority="item.priority" />
       </grid-item>
     </grid-layout>
   </div>
@@ -425,6 +423,7 @@ export default {
           ],
           name: "All Widget - Gantt",
           businessType: "Custom",
+          priority: 2,
           integrationCode: ["TEAMS"],
         },
         {
@@ -522,6 +521,16 @@ export default {
       ],
       scheduler: new Scheduler(),
     };
+  },
+  created() {
+    this.scheduler
+      .launch(this.layout)
+      .addEdges([
+        {
+          source: "162e7b62-dd40-48bb-b3ab-1aa6a3927185",
+          target: "cd4ca9c4-006a-4c92-8585-9616f6182ecf",
+        },
+      ]);
   },
 };
 </script>

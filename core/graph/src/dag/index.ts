@@ -72,6 +72,7 @@ export class DAG<T extends Node> {
 
     if (this.hasNode(id)) return this;
 
+    node.priority = node.priority ?? 1
     this.nodes.set(id, node);
     this.outEdges.set(id, new Set());
     this.inEdges.set(id, new Set());
@@ -195,7 +196,6 @@ export class DAG<T extends Node> {
     const tgtId = this.resolveId(target);
     return this.outEdges.get(srcId)?.has(tgtId) ?? false;
   }
-
 
   public isReachable(source: string | T, target: string | T): boolean {
     const srcId = this.resolveId(source);
