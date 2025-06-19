@@ -1,5 +1,5 @@
 <template>
-  <div class="widget">
+  <div class="widget" @click="root.scheduler.reset(id)">
     {{ name }}
     <div v-if="visible">可见</div>
     <div v-if="loading">Loading</div>
@@ -7,12 +7,15 @@
 </template>
 
 <script>
+const sleep = (time = 1000) =>
+  new Promise((resolve) => setTimeout(resolve, time));
+
 export default {
   inject: ["root"],
   props: {
     id: String,
     name: String,
-    priority: {
+    p: {
       type: Number,
       default: 1,
     },
@@ -20,8 +23,12 @@ export default {
   data() {
     return {
       status: 0,
+      priority: this.p,
+
       visible: false,
       loading: true,
+
+      done: null,
     };
   },
   mounted() {
@@ -31,12 +38,13 @@ export default {
     this.root.scheduler.unobserve(this.$el);
   },
   methods: {
-    fetchData() {
-      return new Promise((resove) => {
-        setTimeout(() => {
-          console.log(this.name);
-          resove();
-        }, 2000);
+    async onSetup() {
+      console.log(this.name);
+    },
+
+    onDone() {
+      return new Promise((resolve) => {
+        this.done = resolve;
       });
     },
   },

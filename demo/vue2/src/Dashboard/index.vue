@@ -20,7 +20,7 @@
         :i="item.i"
         :key="item.i"
       >
-        <Widget :id="item.i" :name="item.name" :priority="item.priority" />
+        <Widget :id="item.i" :name="item.name" :p="item.priority" />
       </grid-item>
     </grid-layout>
   </div>
