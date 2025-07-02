@@ -23,4 +23,6 @@ export interface Node<Props = {}> extends Position {
   props?: Props;
 
   weight?: number;
+
+  ariaLabel?: string
 }
