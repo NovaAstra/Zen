@@ -2,5 +2,8 @@ packages:
   - ui/**
   - core/**
   - demo/**
+
 ignoredBuiltDependencies:
+  - '@parcel/watcher'
   - core-js
+  - yorkie

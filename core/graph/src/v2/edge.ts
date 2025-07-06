@@ -9,4 +9,6 @@ export interface Edge {
   weight?: number;
 
   condition?: string;
+
+  events?: string[];
 }
