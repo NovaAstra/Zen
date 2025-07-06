@@ -24,9 +24,9 @@
 import VueGridLayout from "vue-grid-layout";
 import { isEmpty, isArray, pick, keys } from "lodash-es";
 
+import { withColor } from "@/utilties";
 import ZenDashboardWidget from "./Widget";
 import { validateLayout } from "./validators";
-import { withColor } from "./withColor";
 
 export default {
   name: "ZenDashboard",

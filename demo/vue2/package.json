@@ -14,7 +14,6 @@
     "gridstack": "^12.2.1",
     "js-cookie": "^3.0.5",
     "lodash-es": "^4.17.21",
-    "normalize.css": "^8.0.1",
     "vue": "^2.6.14",
     "vue-grid-layout": "^2.4.0"
   },
@@ -24,11 +23,14 @@
     "@vue/cli-plugin-babel": "~5.0.0",
     "@vue/cli-plugin-eslint": "~5.0.0",
     "@vue/cli-service": "~5.0.0",
+    "autoprefixer": "^9.8.8",
     "babel-plugin-dynamic-import-node": "^2.3.3",
     "eslint": "^7.32.0",
     "eslint-plugin-vue": "^8.0.3",
+    "postcss": "^7.0.39",
     "sass": "^1.32.7",
     "sass-loader": "^12.0.0",
+    "tailwindcss": "^3.4.17",
     "vue-template-compiler": "^2.6.14"
   },
   "eslintConfig": {

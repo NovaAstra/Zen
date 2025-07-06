@@ -1,4 +1,6 @@
-import 'normalize.css/normalize.css'
+import '@/styles/tailwindcss.css'
+import '@/styles/element-variables.scss'
+import '@/styles/index.scss'
 
 import Vue from 'vue'
 import Cookies from 'js-cookie'
