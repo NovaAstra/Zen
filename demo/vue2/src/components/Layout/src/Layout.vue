@@ -3,7 +3,7 @@
     <header class="zen-layout__head absolute inset-x-0">
       <slot name="head"></slot>
     </header>
-    <aside class="zen-layout__side absolute bottom-0 left-0 pt-4">
+    <aside class="zen-layout__side absolute bottom-0 left-0 flex flex-col">
       <slot name="side"></slot>
     </aside>
     <main class="zen-layout__body absolute bottom-0 right-0 overflow-y-auto">

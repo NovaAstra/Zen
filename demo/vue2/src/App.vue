@@ -4,21 +4,25 @@
       <ZenHead />
     </template>
     <template #side>
-      <ZenMenu :menus="menus"/>
+      <ZenMenu :menus="menus" class="flex-1" />
+      <ZenDivider />
+      <ZenAuth />
     </template>
   </ZenLayout>
 </template>
 
 <script>
 import { ZenLayout } from "./components";
-import { ZenHead,ZenMenu } from "./materials";
+import { ZenHead, ZenMenu, ZenAuth, ZenDivider } from "./materials";
 
 export default {
   name: "App",
   components: {
     ZenLayout,
     ZenHead,
-    ZenMenu
+    ZenMenu,
+    ZenAuth,
+    ZenDivider,
   },
   data() {
     return {
@@ -28,6 +32,7 @@ export default {
           path: "0",
           meta: {
             title: "Home",
+            icon: "home|svg",
           },
         },
         {
@@ -35,14 +40,15 @@ export default {
           path: "1",
           meta: {
             title: "Sentiment Analysis Results",
+            icon: "analysis|svg",
           },
         },
         {
-          title: "Tickets",
           name: "2",
           path: "2",
           meta: {
             title: "Tickets",
+            icon: "robot|svg",
           },
           children: [
             {
@@ -68,6 +74,24 @@ export default {
               },
             },
           ],
+        },
+        {
+          name: "7",
+          path: "7",
+          meta: {
+            title: "Settings",
+            icon: "setting|svg",
+            stick: true,
+          },
+        },
+        {
+          name: "8",
+          path: "8",
+          meta: {
+            title: "Refresh",
+            icon: "refresh|svg",
+            stick: true,
+          },
         },
       ],
     };

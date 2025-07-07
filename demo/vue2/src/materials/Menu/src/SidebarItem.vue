@@ -1,12 +1,16 @@
 <template>
   <ElMenuItem
-    class="zen-sidebar-item !leading-none overflow-hidden"
-    :data-level="level"
+    class="zen-sidebar-item !leading-none overflow-hidden w-full"
     v-if="!item.children"
+    :data-level="level"
+    :data-index="index"
     :index="item.path"
-    :style="{paddingLeft: level * 12 + 'px'}"
   >
-    <ZenMenuItem :icon="item.meta && item.meta.icon" :title="item.meta.title">
+    <ZenMenuItem
+      :icon="item.meta && item.meta.icon"
+      :title="item.meta.title"
+      :style="{ paddingLeft: level ** 2 * 12 + 'px !important' }"
+    >
       <template v-for="tag in getSlotTags" v-slot:[tag]>
         <slot :name="`${item.name}-${tag}`" />
       </template>
@@ -45,6 +49,7 @@ import ZenMenuItem from "./Item.vue";
 export default {
   name: "ZenSidebarItem",
   inheritAttrs: false,
+  inject: ["menu"],
   components: {
     ZenMenuItem,
   },
@@ -56,6 +61,10 @@ export default {
     level: {
       type: Number,
       default: 1,
+    },
+    index: {
+      type: Number,
+      default: 0,
     },
   },
   computed: {

@@ -1,27 +1,40 @@
 <template>
-  <div class="zen-head flex items-center px-4 h-full w-full">
+  <div class="zen-head flex items-center px-4 h-full w-full justify-between">
     <div class="zen-head__left inline-flex items-center gap-x-4">
-      <ZenSvgIcon name="dashboard" />
-      <span class="zen-head-title"
-        >AI Ticket Sentiment Analysis For ConnectWise
+      <ZenIcon :name="icon" background="linear-gradient(203deg, #17B3A3 5.4%, #4A83E8 63.38%, #6D74FF 94.6%)"/>
+      <span class="zen-head-title">
+        {{ title }}
       </span>
     </div>
     <div class="zen-head__right inline-flex items-center">
-      <ZenSvgIcon name="logo" />
+      <ElImage :src="logo" />
     </div>
   </div>
 </template>
 
 <script>
-import { ZenSvgIcon } from "@/components";
+import { ZenIcon } from "@/components";
 
 export default {
   name: "ZenHead",
   inheritAttrs: false,
   components: {
-    ZenSvgIcon,
+    ZenIcon,
   },
-  props: {},
+  props: {
+    title: {
+      type: String,
+      default: "AI Ticket Sentiment Analysis For ConnectWise",
+    },
+    icon: {
+      type: String,
+      default: "dashboard|svg",
+    },
+    logo:{
+      type:String,
+      default: ''
+    }
+  },
 };
 </script>
 
@@ -35,6 +48,11 @@ $prefix: ".zen-head";
     color: #303133;
     font-size: 20px;
     font-weight: 700;
+  }
+
+  .el-image{
+    height: 40px;
+    min-width: 190px;
   }
 }
 </style>

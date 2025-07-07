@@ -1,5 +1,5 @@
 export * from "./Dashboard"
+export * from "./Icon"
 export * from "./Iframe"
 export * from "./Layout"
 export * from "./Material"
-export * from "./SvgIcon"

@@ -1,1 +1,0 @@
-export { default as ZenSvgIcon } from "./src/SvgIcon"

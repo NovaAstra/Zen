@@ -1,24 +1,38 @@
 <template>
-  <div v-bind="mergedProps" class="zen-menu w-full">
-    <ElMenu>
-      <SidebarItem :key="item.path" :item="item" v-for="item in menus">
+  <div v-bind="mergedProps" class="zen-menu w-full py-4">
+    <ElMenu class="h-full">
+      <ZenSidebarItem
+        :key="item.path"
+        :item="item"
+        :index="index"
+        v-for="(item, index) in menus"
+        :style="getStickStyle(item)"
+      >
         <template v-for="tag in getSlotTags" v-slot:[`${item.name}-${tag}`]>
           <slot :name="`${item.name}-${tag}`" />
         </template>
-      </SidebarItem>
+      </ZenSidebarItem>
     </ElMenu>
   </div>
 </template>
 
 <script>
+import { get } from "lodash-es";
 import { withColor } from "@/utilties";
-import SidebarItem from "./SidebarItem.vue";
+import ZenSidebarItem from "./SidebarItem.vue";
+import ZenMenuItem from "./Item.vue";
 
 export default {
   name: "ZenMenu",
   inheritAttrs: false,
+  provide() {
+    return {
+      menu: this,
+    };
+  },
   components: {
-    SidebarItem,
+    ZenMenuItem,
+    ZenSidebarItem,
   },
   props: {
     background: {
@@ -29,6 +43,10 @@ export default {
       type: Array,
       default: () => [],
     },
+  },
+  data() {
+    this.stickTotal = 0;
+    return {};
   },
   computed: {
     getMenuStyle() {
@@ -44,6 +62,18 @@ export default {
     },
     getSlotTags() {
       return ["icon", "name", "tag"];
+    },
+  },
+  methods: {
+    getStickStyle(item) {
+      const stick = get(item, "meta.stick", false);
+
+      if (!stick) return {};
+
+      return {
+        position: "absolute",
+        bottom: this.stickTotal++ * 34 + "px",
+      };
     },
   },
 };
@@ -67,7 +97,7 @@ $prefix-sidebar-item: ".zen-sidebar-item";
 
     #{$prefix-sidebar-item}.el-menu-item {
       height: 34px;
-      padding-right: 12px !important;
+      padding: 0 12px !important;
       transition: background-color 0.3s ease;
 
       &::before {
@@ -84,6 +114,10 @@ $prefix-sidebar-item: ".zen-sidebar-item";
 
         #{$prefix-menu-item} {
           color: #182230;
+
+          &-icon{
+            color: #158DEF;
+          }
 
           &::before {
             background-color: #f2f4f7;

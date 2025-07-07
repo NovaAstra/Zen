@@ -10,7 +10,6 @@ import EN from 'element-ui/lib/locale/lang/en'
 
 import App from '@/App.vue'
 
-
 Vue.use(Element, {
   size: Cookies.get('size') || 'medium', // set element-ui default size
   locale: EN // 如果使用中文，无需设置，请删除

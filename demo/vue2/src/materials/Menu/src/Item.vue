@@ -1,7 +1,7 @@
 <template>
   <div class="zen-menu-item h-full flex items-center gap-x-2 relative">
     <slot name="icon">
-      <span class="zen-menu-item-icon" v-if="icon">{{ icon }}</span>
+      <ZenIcon class="zen-menu-item-icon" v-if="icon" :name="icon" />
     </slot>
 
     <slot>
@@ -13,9 +13,14 @@
 </template>
 
 <script>
+import { ZenIcon } from "@/components";
+
 export default {
   name: "ZenMenuItem",
   inheritAttrs: false,
+  components: {
+    ZenIcon,
+  },
   props: {
     icon: String,
     title: String,
