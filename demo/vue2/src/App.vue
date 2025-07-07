@@ -1,13 +1,24 @@
 <template>
-  <ZenMenu :menus="menus" />
+  <ZenLayout>
+    <template #head>
+      <ZenHead />
+    </template>
+    <template #side>
+      <ZenMenu :menus="menus"/>
+    </template>
+  </ZenLayout>
 </template>
 
 <script>
-import { ZenMenu } from "./materials";
+import { ZenLayout } from "./components";
+import { ZenHead,ZenMenu } from "./materials";
+
 export default {
   name: "App",
   components: {
-    ZenMenu,
+    ZenLayout,
+    ZenHead,
+    ZenMenu
   },
   data() {
     return {

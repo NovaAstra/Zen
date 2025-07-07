@@ -55,8 +55,6 @@ $prefix-menu-item: #{$prefix}-item;
 $prefix-sidebar-item: ".zen-sidebar-item";
 
 #{$prefix} {
-  max-width: 248px;
-
   @mixin el-menu-font {
     font-size: 12px;
     font-style: normal;
@@ -69,7 +67,7 @@ $prefix-sidebar-item: ".zen-sidebar-item";
 
     #{$prefix-sidebar-item}.el-menu-item {
       height: 34px;
-      padding: 0 12px !important;
+      padding-right: 12px !important;
       transition: background-color 0.3s ease;
 
       &::before {

@@ -8,3 +8,10 @@ export default {
   inheritAttrs: false,
 };
 </script>
+
+<style lang="scss">
+$prefix: ".zen-auth";
+
+#{$prefix} {
+}
+</style>

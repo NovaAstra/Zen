@@ -12,5 +12,18 @@
     "@vitest/coverage-istanbul": "^3.1.4",
     "typescript": "^5.8.3",
     "vitest": "^3.1.4"
+  },
+  "pnpm": {
+    "peerDependencyRules": {
+      "ignoreMissing": [
+        "webpack"
+      ]
+    },
+    "ignoredBuiltDependencies": [
+      "@parcel/watcher",
+      "core-js",
+      "esbuild",
+      "yorkie"
+    ]
   }
 }

@@ -1,8 +1,10 @@
 <template>
   <ElMenuItem
     class="zen-sidebar-item !leading-none overflow-hidden"
+    :data-level="level"
     v-if="!item.children"
     :index="item.path"
+    :style="{paddingLeft: level * 12 + 'px'}"
   >
     <ZenMenuItem :icon="item.meta && item.meta.icon" :title="item.meta.title">
       <template v-for="tag in getSlotTags" v-slot:[tag]>
@@ -28,6 +30,7 @@
       v-for="child in item.children"
       :key="child.path"
       :item="child"
+      :level="level + 1"
     >
       <template v-for="tag in getSlotTags" v-slot:[`${child.name}-${tag}`]>
         <slot :name="`${child.name}-${tag}`" />
@@ -49,6 +52,10 @@ export default {
     item: {
       type: Object,
       required: true,
+    },
+    level: {
+      type: Number,
+      default: 1,
     },
   },
   computed: {
