@@ -1,13 +1,39 @@
 {
-  "name": "@mspbots-bpx/app-inject-watermark",
+  "name": "@zen-bpx/app-inject-watermark",
   "version": "0.0.1",
   "private": false,
-  "type": "module",
-  "scripts": {
-   
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs",
+      "types": "./dist/index.d.ts"
+    },
+    "./vite": {
+      "require": "./dist/vite/index.cjs",
+      "import": "./dist/vite/index.mjs",
+      "types": "./dist/vite/index.d.ts"
+    },
+    "./webpack": {
+      "require": "./dist/webpack/index.cjs",
+      "import": "./dist/webpack/index.mjs",
+      "types": "./dist/webpack/index.d.ts"
+    }
   },
+  "scripts": {
+    "stub": "pnpm unbuild --stub"
+  },
+  "files": [
+    "dist"
+  ],
   "devDependencies": {
+    "html-webpack-plugin": "^5.6.3",
     "unbuild": "^3.5.0",
     "webpack": "^5.100.2"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

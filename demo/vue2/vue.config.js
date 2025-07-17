@@ -1,6 +1,7 @@
 const { defineConfig } = require('@vue/cli-service')
 const path = require('path')
 const { WebpackAppInjectLoading } = require('@zen-bpx/app-inject-loading/webpack');
+const { WebpackAppInjectWatermark } = require('@zen-bpx/app-inject-watermark/webpack');
 
 const resolve = (dir) => path.join(__dirname, dir)
 
@@ -22,7 +23,8 @@ module.exports = defineConfig({
       }
     },
     plugins: [
-      WebpackAppInjectLoading("./public/loading.html")
+      WebpackAppInjectLoading(),
+      WebpackAppInjectWatermark()
     ],
     cache: {
       type: 'filesystem'

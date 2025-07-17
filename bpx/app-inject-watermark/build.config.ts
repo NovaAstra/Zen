@@ -5,6 +5,14 @@ export default defineBuildConfig({
   declaration: true,
   entries: [
     'src/index',
-    "webpack"
+    'src/vite/index',
+    'src/webpack/index',
   ],
+  rollup: {
+    emitCJS: true,
+    inlineDependencies: true,
+    esbuild: {
+      drop: [],
+    }
+  }
 });
