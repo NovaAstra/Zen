@@ -24,6 +24,7 @@
     "@vue/cli-plugin-babel": "~5.0.0",
     "@vue/cli-plugin-eslint": "~5.0.0",
     "@vue/cli-service": "~5.0.0",
+    "@zen-bpx/app-inject-loading": "workspace:*",
     "autoprefixer": "^9.8.8",
     "babel-plugin-dynamic-import-node": "^2.3.3",
     "eslint": "^7.32.0",
@@ -31,11 +32,10 @@
     "postcss": "^7.0.39",
     "sass": "^1.32.7",
     "sass-loader": "^12.0.0",
-    "tailwindcss": "^3.4.17",
     "svg-sprite-loader": "^6.0.11",
     "svgo": "1.2.0",
-    "vue-template-compiler": "^2.6.14",
-    "@zen-bpx/app-inject-loading": "workspace:*"
+    "tailwindcss": "^3.4.17",
+    "vue-template-compiler": "^2.6.14"
   },
   "eslintConfig": {
     "root": true,
