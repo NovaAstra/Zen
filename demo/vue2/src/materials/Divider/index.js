@@ -1,1 +1,0 @@
-export { default as ZenDivider } from "./src/Divider"

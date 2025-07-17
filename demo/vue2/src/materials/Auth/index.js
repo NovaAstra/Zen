@@ -1,1 +1,0 @@
-export { default as ZenAuth } from "./src/Auth"

@@ -1,0 +1,13 @@
+{
+  "name": "@mspbots-bpx/app-inject-watermark",
+  "version": "0.0.1",
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "stub": "pnpm unbuild --stub"
+  },
+  "devDependencies": {
+    "unbuild": "^3.5.0",
+    "webpack": "^5.100.2"
+  }
+}

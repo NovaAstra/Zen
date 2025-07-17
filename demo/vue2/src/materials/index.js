@@ -1,5 +1,0 @@
-export * from "./Auth"
-export * from "./Divider"
-export * from "./Head"
-export * from "./Menu"
-export * from "./View"

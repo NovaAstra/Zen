@@ -1,1 +1,0 @@
-export { default as ZenMaterial } from "./src/Material"
