@@ -1,24 +1,23 @@
-import { type Compiler, Compilation,sources } from "webpack"
+import { type Compiler, Compilation, sources } from "webpack"
+import HtmlWebpackPlugin from "html-webpack-plugin";
 import { readLoadingHtml, readPackageJSON } from "../common"
 
 const PLUGIN_NAME = 'WebpackAppInjectLoadingPlugin';
 
 export function WebpackAppInjectLoading(
-  namespace: string = 'mspbots',
-  template?: string
+  template: string = 'loading.html',
+  namespace: string = 'zen',
 ) {
   return {
     name: PLUGIN_NAME,
     apply(compiler: Compiler) {
-      compiler.hooks.thisCompilation.tap(PLUGIN_NAME, (compilation: Compilation) => {
-        compilation.hooks.processAssets.tapPromise(
-          {
-            name: PLUGIN_NAME,
-            stage: Compilation.PROCESS_ASSETS_STAGE_ADDITIONS,
-          },
-          async () => {
+      compiler.hooks.compilation.tap(PLUGIN_NAME, (compilation: Compilation) => {
+        const hook = HtmlWebpackPlugin.getHooks(compilation).beforeEmit;
+
+        hook.tapPromise(PLUGIN_NAME,
+          async (data) => {
             const loadingHtml = await readLoadingHtml(template);
-            if (!loadingHtml) return;
+            if (!loadingHtml) return data;
 
             const { version } = await readPackageJSON(process.cwd());
             const scope = process.env[`${namespace}_APP_NAMESPACE`] || namespace
@@ -32,19 +31,9 @@ export function WebpackAppInjectLoading(
               </script>
               `;
 
-            const assetName = 'index.html';
-            const assetSource = compilation.getAsset(assetName);
-            if (!assetSource) {
-              return;
-            }
+            data.html = data.html.replace(/<body\s*>/, `<body>${injectScript}${loadingHtml}`);
 
-            let html = assetSource.source.source().toString();
-            html = html.replace(/<body\s*>/, `<body>${injectScript}${loadingHtml}`);
-
-            compilation.updateAsset(
-              assetName,
-              new sources.RawSource(html)
-            );
+            return data;
           }
         )
       })

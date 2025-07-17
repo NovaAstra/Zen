@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "postinstall": "pnpm -r run stub --if-present",
+    "preinstall": "npx only-allow pnpm",
     "test": "pnpm -r --if-present test",
     "coverage": "pnpm -r --if-present coverage",
     "demo-vue2": "pnpm --filter @zen-demo/vue2 dev"

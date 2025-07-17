@@ -1,10 +1,5 @@
 packages:
-  - ui/**
-  - bpx/**
-  - core/**
-  - demo/**
-
-ignoredBuiltDependencies:
-  - '@parcel/watcher'
-  - core-js
-  - yorkie
+  - ui/*
+  - bpx/*
+  - core/*
+  - demo/*
