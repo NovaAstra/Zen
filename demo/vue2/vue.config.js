@@ -1,5 +1,7 @@
 const { defineConfig } = require('@vue/cli-service')
 const path = require('path')
+const { EsbuildPlugin } = require('esbuild-loader')
+const CompressionWebpackPlugin = require('compression-webpack-plugin')
 const { WebpackAppInjectLoading } = require('@zen-bpx/app-inject-loading/webpack');
 const { WebpackAppInjectWatermark } = require('@zen-bpx/app-inject-watermark/webpack');
 
@@ -16,39 +18,51 @@ module.exports = defineConfig({
       }
     }
   },
-  configureWebpack: {
-    resolve: {
-      alias: {
-        '@': resolve('src')
-      }
-    },
-    plugins: [
-      WebpackAppInjectLoading(),
-      WebpackAppInjectWatermark()
-    ],
-    cache: {
-      type: 'filesystem'
-    }
-  },
+
   chainWebpack(config) {
+    config.resolve.alias
+      .set('@', resolve('src'))
+
+    config.plugins.delete('prefetch')
     if (config.plugins.has('preload')) {
-      // it can improve the speed of the first screen, it is recommended to turn on preload
       config.plugin('preload').tap(() => [
         {
           rel: 'preload',
-          // to ignore runtime.js
-          // https://github.com/vuejs/vue-cli/blob/dev/packages/@vue/cli-service/lib/config/app.js#L171
           fileBlacklist: [/\.map$/, /hot-update\.js$/, /runtime\..*\.js$/],
           include: 'initial'
         }
       ])
     }
 
-    // when there are many pages, it will cause too many meaningless requests
-    config.plugins.delete('prefetch')
+    const rule = config.module.rule('js')
+    rule.uses.clear()
+    rule.use('esbuild-loader').loader('esbuild-loader').options({
+      loader: 'js',
+      target: 'chrome90'
+    })
+
+    config.optimization.minimizers.delete('terser')
+    config.optimization
+      .minimizer('esbuild')
+      .use(EsbuildPlugin, [{
+        minify: true,
+        target: 'chrome90',
+        minifyWhitespace: true,
+        minifyIdentifiers: true,
+        minifySyntax: true
+      }])
+
+    config.module
+      .rule('vue-jsx')
+      .test(/\.jsx?$/)
+      .use('babel-loader')
+      .loader('babel-loader')
+      .options({
+        plugins: ['@vue/babel-plugin-transform-vue-jsx'],
+      })
+      .end();
 
     config.module.rule("svg").uses.clear()
-    // set svg-sprite-loader
     config.module
       .rule('svg')
       .exclude.add(resolve('src/icons'))
@@ -66,12 +80,21 @@ module.exports = defineConfig({
       .end()
 
     config
-      // https://webpack.js.org/configuration/devtool/#development
       .when(process.env.NODE_ENV === 'development',
         config => config.devtool('cheap-source-map'))
+
+
+
     config
       .when(process.env.NODE_ENV !== 'development',
         config => {
+          config.plugin('compression-webpack-plugin')
+            .use(CompressionWebpackPlugin, [{
+              test: /\.(js|css|html|svg)$/,
+              threshold: 10240,
+              deleteOriginalAssets: false
+            }])
+
           config
             .optimization.splitChunks({
               chunks: 'all',
@@ -80,31 +103,28 @@ module.exports = defineConfig({
                   name: 'chunk-libs',
                   test: /[\\/]node_modules[\\/]/,
                   priority: 10,
-                  chunks: 'initial' // only package third parties that are initially dependent
+                  chunks: 'initial'
                 },
                 elementUI: {
-                  name: 'chunk-elementUI', // split elementUI into a single package
-                  priority: 20, // the weight needs to be larger than libs and app or it will be packaged into libs or app
-                  test: /[\\/]node_modules[\\/]_?element-ui(.*)/ // in order to adapt to cnpm
+                  name: 'chunk-elementUI',
+                  priority: 20,
+                  test: /[\\/]node_modules[\\/]_?element-ui(.*)/
                 },
-                components: {
-                  name: 'chunk-components',
-                  test: resolve('src/components'),
-                  minChunks: 3,
-                  priority: 5,
-                  reuseExistingChunk: true
-                },
-                materials: {
-                  name: 'chunk-materials',
-                  test: resolve('src/materials'),
-                  minChunks: 3,
-                  priority: 5,
-                  reuseExistingChunk: true
-                }
+
               }
             })
-          // https:// webpack.js.org/configuration/optimization/#optimizationruntimechunk
           config.optimization.runtimeChunk('single')
         })
-  }
+  },
+  configureWebpack(config) {
+    config.plugins.push(
+      WebpackAppInjectLoading(),
+      WebpackAppInjectWatermark(),
+    )
+
+    config.cache = {
+      type: 'filesystem',
+      allowCollectingMemory: true
+    }
+  },
 })

@@ -1,0 +1,16 @@
+@import './tailwindcss.css';
+
+html {
+  height: 100%;
+}
+
+body {
+  height: 100vh;
+  display: flex;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  font-family: Helvetica Neue, Helvetica, PingFang SC, Hiragino Sans GB, Microsoft YaHei, Arial, sans-serif;
+  font-family: "Raleway", sans-serif;
+  transition: background-color 0.3s ease;
+}

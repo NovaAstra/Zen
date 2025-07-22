@@ -26,7 +26,7 @@ export function WebpackAppInjectLoading(
 
             const injectScript = `
               <script data-app-loading="inject-js">
-                var theme = localStorage.getItem(${cacheName});
+                var theme = localStorage.getItem("${cacheName}");
                 document.documentElement.classList.toggle('dark', /dark/.test(theme));
               </script>
               `;
