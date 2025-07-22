@@ -1,5 +1,5 @@
 {
-  "name": "@zen-demo/vue2",
+  "name": "@zen-app/portal",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,6 +9,7 @@
     "svgo": "svgo -f src/icons/svg --config=src/icons/svgo.yml"
   },
   "dependencies": {
+    "@azure/msal-browser": "^4.15.0",
     "color": "^5.0.0",
     "core-js": "^3.8.3",
     "element-themex": "^1.0.3",
@@ -20,12 +21,14 @@
     "vue-grid-layout": "^2.4.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.12.16",
-    "@vue/cli-service": "~5.0.0",
+    "@babel/core": "^7.28.0",
+    "@babel/preset-env": "^7.28.0",
     "@vue/cli-plugin-babel": "~5.0.0",
+    "@vue/cli-service": "~5.0.0",
     "@zen-bpx/app-inject-loading": "workspace:*",
     "@zen-bpx/app-inject-watermark": "workspace:*",
     "autoprefixer": "^9.8.8",
+    "babel-loader": "^10.0.0",
     "babel-plugin-dynamic-import-node": "^2.3.3",
     "compression-webpack-plugin": "^11.1.0",
     "esbuild-loader": "^4.3.0",

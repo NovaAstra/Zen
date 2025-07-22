@@ -2,8 +2,6 @@ const { defineConfig } = require('@vue/cli-service')
 const path = require('path')
 const { EsbuildPlugin } = require('esbuild-loader')
 const CompressionWebpackPlugin = require('compression-webpack-plugin')
-const { WebpackAppInjectLoading } = require('@zen-bpx/app-inject-loading/webpack');
-const { WebpackAppInjectWatermark } = require('@zen-bpx/app-inject-watermark/webpack');
 
 const resolve = (dir) => path.join(__dirname, dir)
 
@@ -18,7 +16,9 @@ module.exports = defineConfig({
       }
     }
   },
-
+  devServer: {
+    port: 8081,
+  },
   chainWebpack(config) {
     config.resolve.alias
       .set('@', resolve('src'))
@@ -117,11 +117,6 @@ module.exports = defineConfig({
         })
   },
   configureWebpack(config) {
-    config.plugins.push(
-      WebpackAppInjectLoading(),
-      WebpackAppInjectWatermark(),
-    )
-
     config.cache = {
       type: 'filesystem',
       allowCollectingMemory: true
