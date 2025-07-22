@@ -16,9 +16,6 @@ module.exports = defineConfig({
       }
     }
   },
-  devServer: {
-    port: 8081,
-  },
   chainWebpack(config) {
     config.resolve.alias
       .set('@', resolve('src'))
