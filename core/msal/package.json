@@ -5,5 +5,7 @@
   "private": true,
   "sideEffects": false,
   "main": "src/index.ts",
-  "dependencies": {}
+  "dependencies": {
+    "@azure/msal-browser": "^4.15.0"
+  }
 }
