@@ -2,3 +2,5 @@ node_modules
 dist
 
 .pnpm
+*storybook.log
+storybook-static
