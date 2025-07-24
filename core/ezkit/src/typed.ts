@@ -1,6 +1,8 @@
 import type { Primitive, Typed, TypedArray } from "@zen-core/typist"
 
-const primitive = ['Null', 'Undefined', 'String', 'Number', 'Boolean', 'Symbol', 'BigInt']
+const primitive = new Set<Typed>([
+  'Null', 'Undefined', 'String', 'Number', 'Boolean', 'Symbol', 'BigInt',
+]);
 
 export const typed = (input: unknown): Typed => {
   if (input === null) return 'Null'
@@ -11,15 +13,13 @@ export const typed = (input: unknown): Typed => {
   return raw === 'AsyncFunction' ? 'Promise' : raw
 }
 
-export const isPrimitive = (input: unknown): input is Primitive => primitive.includes(typed(input))
+export const isPrimitive = (input: unknown): input is Primitive => primitive.has(typed(input))
 
 export const isPrototype = (input: unknown): boolean => {
   if (typeof input !== 'object' || input === null) return false;
 
-  const constructor = input.constructor;
-  const prototype = typeof constructor === 'function' ? constructor.prototype : Object.prototype;
-
-  return input === prototype;
+  const constructor = (input as object).constructor;
+  return input === (typeof constructor === 'function' ? constructor.prototype : Object.prototype);
 }
 
 export const isLength = (input: unknown): boolean => Number.isSafeInteger(input) && (input as number) >= 0;
@@ -28,7 +28,10 @@ export const isString = (input: unknown): input is string => typed(input) === 'S
 
 export const isNull = (input: unknown): input is null => typed(input) === 'Null'
 
-export const isNil = (input: unknown): input is null | undefined => ['Null', 'Undefined'].includes(typed(input))
+export const isNil = (input: unknown): input is null | undefined => {
+  const type = typed(input);
+  return type === 'Null' || type === 'Undefined';
+}
 
 export const isNumber = (input: unknown): input is number => typed(input) === 'Number'
 
@@ -46,26 +49,29 @@ export const isNode = (): boolean => typeof process !== 'undefined' && process?.
 
 export const isBrowser = (): boolean => typeof window !== 'undefined' && typeof document !== 'undefined' && window.document === document;
 
-export const isArrayLike = (input: unknown): input is ArrayLike<unknown> => {
-  return !['Null', 'Function'].includes(typed(input)) && isLength((input as ArrayLike<unknown>).length);
-}
+export const isArrayLike = (input: unknown): input is ArrayLike<unknown> =>
+  input != null && !isFunction(input) && isLength((input as ArrayLike<unknown>).length);
 
-export const isTypedArray = (input: unknown): input is TypedArray => ArrayBuffer.isView(input) && !(input instanceof DataView);
+export const isTypedArray = (input: unknown): input is TypedArray =>
+  ArrayBuffer.isView(input) && !(input instanceof DataView);
 
-export const isArguments = (input?: unknown): input is IArguments => typed(input) === 'Arguments';
+export const isArguments = (input: unknown): input is IArguments => typed(input) === 'Arguments';
 
 export const isError = (input: unknown): input is Error => typed(input) === 'Error';
 
-export const isEmpty = (input?: unknown): boolean => {
-  if (input === true || input === false) return true
-  if (input === null || input === undefined) return true
+export const isEmpty = (input: unknown): boolean => {
+  if (input == null || input === true || input === false) return true;
+
   if (isNumber(input)) return input === 0
   if (isDate(input)) return isNaN(input.getTime())
   if (isFunction(input)) return false
-  if (isSymbol(input)) return false
+
   if (isArrayLike(input)) return (input as ArrayLike<unknown>).length === 0;
-  const size = (input as { size?: unknown })?.size;
-  if (typeof size === 'number') return size === 0;
-  if (typeof input === 'object') return Object.keys(input as object).length === 0;
+
+  if (typeof input === "object") {
+    const size = (input as { size?: unknown }).size;
+    if (typeof size === "number") return size === 0;
+    return Object.keys(input as object).length === 0;
+  }
   return false
 }

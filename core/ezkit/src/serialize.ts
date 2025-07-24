@@ -1,4 +1,7 @@
 import type { TypedArray } from "@zen-core/typist"
+import { typed } from "./typed"
+
+const toString = Object.prototype.toString;
 
 export class Serializer {
   private readonly context: Map<object, string> = new Map();
@@ -21,12 +24,19 @@ export class Serializer {
     }
   }
 
-  public $object() {
+  public $object(object: object): string {
+    const cached = this.context.get(object);
+    if (cached !== undefined) return cached;
 
+    const id = `#${this.context.size}`;
+    this.context.set(object, id);
+    const serialized = this.objectify(object);
+    this.context.set(object, serialized);
+    return serialized;
   }
 
   public $function(input: Function): string {
-    const code = Function.prototype.toString.call(input).trim();
+    const code = toString.call(input).trim();
     const name = input.name || "anonymous";
 
     if (code.endsWith("[native code] }")) return `${name}()[native]`;
@@ -46,63 +56,60 @@ export class Serializer {
     return `ArrayBuffer[${new Uint8Array(input).join(",")}]`;
   }
 
+  private $set(set: Set<any>) {
+    return `Set${this.$array(Array.from(set).sort((a, b) => this.compare(a, b)))}`;
+  }
+
+  private $map(map: Map<unknown, unknown>) {
+    return this.entries("Map", map.entries());
+  }
+
   private encode(value: unknown) {
     return ''
   }
 
-  private objectify(object: Record<string, unknown>) {
-    const tag = Object.prototype.toString.call(object);
+  private objectify(object: object) {
+    const type = typed(object);
+    if (type !== "Object") return this.buildin(type, object);
 
-    // 不是 [object Object]，当作内建类型处理
-    if (tag !== "[object Object]") {
-      const type = tag.length < 10 ? `unknown:${tag}` : tag.slice(8, -1);
-      return this.buildin(type, object);
-    }
+    const ctor = (object as Record<string, unknown>).constructor;
+    const name = ctor === Object || !ctor ? "" : ctor.name;
 
-    const ctor = object.constructor;
-    const name = ctor === Object || ctor === undefined ? "" : ctor.name;
-
-    // 如果是全局构造函数实例（如 Map、Set 等）
     if (name && (globalThis as any)[name] === ctor) {
       return this.buildin(name, object);
     }
-
-    // 支持 toJSON 且是自定义对象
     if (typeof (object as any).toJSON === "function") {
       const json = (object as any).toJSON();
-      return name + (
-        json !== null && typeof json === "object"
-          ? this.$object()
-          : `(${this.serialize(json)})`
-      );
+      return name + (json && typeof json === "object" ? this.$object(json) : `(${this.serialize(json)})`);
     }
 
-    // 常规对象序列化
     const keys = Object.keys(object).sort((a, b) => a.localeCompare(b));
-    const body = keys
-      .map(key => `${key}:${this.serialize(object[key])}`)
-      .join(",");
-
+    const body = keys.map(key => `${key}:${this.serialize((object as Record<string, unknown>)[key])}`).join(",");
     return `${name}{${body}}`;
   }
 
   private buildin(type: string, value: unknown): string {
-    const name = `$${type}` as keyof this;
+    const fn = Reflect.get(this, `$${type}`) as ((arg: unknown) => string) | undefined;
 
-    const handler = this[name];
-    if (typeof handler === "function") {
-      return (handler as (arg: unknown) => string).call(this, value);
-    }
+    if (typeof fn === "function") return fn.call(this, value);
 
     if (
-      typeof value === "object" &&
-      value !== null &&
-      typeof (value as any).entries === "function"
+      value != null &&
+      typeof value === 'object' &&
+      typeof (value as any).entries === 'function'
     ) {
       return this.entries(type, (value as any).entries());
     }
 
-    throw new Error(`Cannot serialize type: ${type}`);
+    throw new Error(
+      [
+        `Cannot serialize built-in type "${type}".`,
+        `- No method "$${type}" found on serializer.`,
+        `- The value does not have a valid .entries() method.`,
+        `- Received: ${Object.prototype.toString.call(value)}`
+      ].join('\n')
+    );
+
   }
 
   private entries(type: string, entries: Iterable<[unknown, unknown]>): string {
