@@ -1,5 +1,5 @@
 import type { TypedArray } from "@zen-core/typist"
-
+import { typed } from "./typed"
 
 export class Serializer {
   private readonly context: Map<object, string> = new Map();
@@ -46,6 +46,14 @@ export class Serializer {
   public $buffer(input: ArrayBuffer) {
     return `ArrayBuffer[${new Uint8Array(input).join(",")}]`;
   }
+
+  private encode(value: unknown) { }
+
+  private objectify(object: Record<string, unknown>) { }
+
+  private buildin(type: string, object: unknown) { }
+
+  private entries(type: string, entries: Iterable<[unknown, unknown]>) { }
 
   private compare(a: unknown, b: unknown): number {
     if (typeof a === typeof b) {
