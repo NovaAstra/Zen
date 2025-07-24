@@ -47,7 +47,9 @@ export class Serializer {
     return `ArrayBuffer[${new Uint8Array(input).join(",")}]`;
   }
 
-  private encode(value: unknown) { }
+  private encode(value: unknown) {
+    return ''
+  }
 
   private objectify(object: Record<string, unknown>) { }
 
