@@ -13,11 +13,11 @@ import {
 export interface IMsalClient {
   readonly configuration: Configuration;
 
-  login(): Promise<void | AuthenticationResult>;
+  login<State extends object>(state?: State): Promise<void | AuthenticationResult>;
   logout(): Promise<void>;
 }
 
-export interface IMsalClientOptions<State = {}> {
+export interface IMsalClientOptions<State> {
   name?: string;
   version?: string;
   sso?: string;
@@ -25,19 +25,19 @@ export interface IMsalClientOptions<State = {}> {
   configuration: Configuration;
 }
 
-export interface IMsalClientPopupOptions extends IMsalClientOptions {
+export interface IMsalClientPopupOptions<State> extends IMsalClientOptions<State> {
   request: PopupRequest;
   logoutRequest?: EndSessionPopupRequest;
   interactionType: InteractionType.Popup;
 }
 
-export interface IMsalClientRedirectOptions extends IMsalClientOptions {
+export interface IMsalClientRedirectOptions<State> extends IMsalClientOptions<State> {
   request?: RedirectRequest;
   logoutRequest?: EndSessionRequest;
   interactionType: InteractionType.Redirect;
 }
 
-export type MsalClientOptions = IMsalClientPopupOptions | IMsalClientRedirectOptions;
+export type MsalClientOptions<State extends object = object> = IMsalClientPopupOptions<State> | IMsalClientRedirectOptions<State>;
 
 type Listener<T> = (state: T) => void;
 
@@ -72,39 +72,44 @@ export const toString = (value: unknown, defaultValue: string = '') => {
   return defaultValue;
 }
 
-export class MsalClientLogger {
-  protected logger: Logger;
+export const getErrorMessage = (error: unknown, defaultMessage: string = 'unknown error'): string => {
+  if (error instanceof Error) {
+    return error.message ?? defaultMessage;
+  }
+  return defaultMessage;
+};
 
-  public constructor(public readonly options: MsalClientOptions) { }
+export class MsalClientLogger {
+  private readonly logger: Logger;
+
+  public constructor(public readonly options: MsalClientOptions) {
+    const { name, version } = options
+    this.logger = MsalClient.app.getLogger().clone(name, version);
+  }
 
   public verbose(message: string, correlationId?: string) {
-    this._log().verbose(message, correlationId);
+    this.logger.verbose(message, correlationId);
   }
   public info(message: string, correlationId?: string) {
-    this._log().info(message, correlationId);
+    this.logger.info(message, correlationId);
   }
   public warning(message: string, correlationId?: string) {
-    this._log().warning(message, correlationId);
+    this.logger.warning(message, correlationId);
   }
   public error(message: string, correlationId?: string) {
-    this._log().error(message, correlationId);
-  }
-
-  private _log(): Logger {
-    const { name, version } = this.options
-    return this.logger ?? (this.logger = MsalClient.app.getLogger().clone(name, version));
+    this.logger.error(message, correlationId);
   }
 }
 
-export class MsalClientContext<State = {}> {
+export class MsalClientContext<State extends object = object> {
   private state: State;
-  private listeners: Set<Listener<State>> = new Set();
+  private readonly listeners: Set<Listener<State>> = new Set();
 
   constructor(initialState?: State) {
     this.state = initialState ?? ({} as State);
   }
 
-  public getState(): State {
+  public getState(): Readonly<State> {
     return this.state;
   }
 
@@ -113,36 +118,39 @@ export class MsalClientContext<State = {}> {
     this.emit();
   }
 
-  public subscribe(listener: Listener<State>): () => void {
+  public on(listener: Listener<State>): () => void {
     this.listeners.add(listener);
     listener(this.state);
     return () => this.listeners.delete(listener);
   }
 
   private emit(): void {
-    for (const listener of this.listeners) {
-      listener(this.state);
-    }
+    this.listeners.forEach(listener => listener(this.state));
+  }
+
+  public dispose() {
+    this.listeners.clear();
+    this.state = {} as State;
   }
 }
 
-export class MsalClient extends MsalClientLogger implements IMsalClient {
-  public static async setup(options: MsalClientOptions): Promise<MsalClient> {
-    const client = new MsalClient(options);
+export class MsalClient<State extends object = object> extends MsalClientLogger implements IMsalClient {
+  public static app: PublicClientApplication = null;
+  public static initialized: boolean = false;
+
+  public static async setup<State extends object = object>(options: MsalClientOptions): Promise<MsalClient> {
+    const client = new MsalClient<State>(options);
     await client.bootstrap();
     return client;
   }
 
-  public static app: PublicClientApplication = null;
-  public static initialized: boolean = false;
-
-  public context: MsalClientContext = new MsalClientContext();
+  public readonly context: MsalClientContext<State> = null;
   public readonly configuration: Configuration = null;
 
   public constructor(public readonly options: MsalClientOptions) {
     super(options);
     this.configuration = options.configuration;
-    this.context = new MsalClientContext(options.state);
+    this.context = new MsalClientContext<State>(options.state);
   }
 
   private async bootstrap(): Promise<void> {
@@ -156,6 +164,9 @@ export class MsalClient extends MsalClientLogger implements IMsalClient {
       } catch (e) {
         MsalClient.initialized = false
         MsalClient.app = null
+
+        const message = getErrorMessage(e)
+        this.error(message)
       }
     }
   }
@@ -169,6 +180,10 @@ export class MsalClient extends MsalClientLogger implements IMsalClient {
   }
 
   public async logout(): Promise<void> {
+    if (!MsalClient.initialized || !MsalClient.app) {
+      throw new Error('Msal Client is not initialized');
+    }
+
     return await this._logout()
   }
 
@@ -178,8 +193,15 @@ export class MsalClient extends MsalClientLogger implements IMsalClient {
       ? MsalClient.app.loginPopup
       : MsalClient.app.loginRedirect
 
-    request.state = toString(state)
-    return login(request)
+    try {
+      request.state = toString(state)
+      await login(request)
+      this.info(`Login successful with interaction type: ${interactionType}`);
+      return
+    } catch (e) {
+      const message = getErrorMessage(e)
+      this.error(message)
+    }
   }
 
   private async _logout() {
@@ -187,6 +209,15 @@ export class MsalClient extends MsalClientLogger implements IMsalClient {
     const logout = interactionType === InteractionType.Popup
       ? MsalClient.app.logoutPopup
       : MsalClient.app.logoutRedirect
-    return logout(logoutRequest)
+
+    try {
+      await logout(logoutRequest)
+      this.info(`Logout successful with interaction type: ${interactionType}`);
+    } catch (e) {
+      const message = getErrorMessage(e)
+      this.error(message)
+    } finally {
+      this.context.dispose()
+    }
   }
 }

@@ -1,0 +1,11 @@
+{
+  "name": "@zen-core/ezkit",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "sideEffects": false,
+  "main": "src/index.ts",
+  "devDependencies": {
+    "@zen-core/typist": "workspace:*"
+  }
+}

@@ -145,6 +145,12 @@ importers:
         specifier: ^5.100.2
         version: 5.100.2
 
+  core/ezkit:
+    devDependencies:
+      '@zen-core/typist':
+        specifier: workspace:*
+        version: link:../typist
+
   core/graph:
     dependencies:
       '@zen-core/queue':
@@ -166,6 +172,8 @@ importers:
         version: link:../heap
 
   core/reactivity: {}
+
+  core/typist: {}
 
 packages:
 
