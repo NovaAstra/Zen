@@ -54,7 +54,14 @@ export class Serializer {
 
   private buildin(type: string, object: unknown) { }
 
-  private entries(type: string, entries: Iterable<[unknown, unknown]>) { }
+  private entries(type: string, entries: Iterable<[unknown, unknown]>): string {
+    const sorted = Array.from(entries).sort((a, b) => this.compare(a[0], b[0]));
+    const body = sorted
+      .map(([key, value]) => `${this.serialize(key, true)}:${this.serialize(value)}`)
+      .join(",");
+
+    return `${type}{${body}}`;
+  }
 
   private compare(a: unknown, b: unknown): number {
     if (typeof a === typeof b) {
