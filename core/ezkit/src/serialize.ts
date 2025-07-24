@@ -1,5 +1,4 @@
 import type { TypedArray } from "@zen-core/typist"
-import { typed } from "./typed"
 
 export class Serializer {
   private readonly context: Map<object, string> = new Map();
