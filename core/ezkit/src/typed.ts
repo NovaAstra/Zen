@@ -2,70 +2,70 @@ import type { Primitive, Typed, TypedArray } from "@zen-core/typist"
 
 const primitive = ['Null', 'Undefined', 'String', 'Number', 'Boolean', 'Symbol', 'BigInt']
 
-export const typed = (value: unknown): Typed => {
-  if (value === null) return 'Null'
-  if (value === undefined) return 'Undefined'
-  if (typeof value === 'number' && Number.isNaN(value)) return 'NaN';
+export const typed = (input: unknown): Typed => {
+  if (input === null) return 'Null'
+  if (input === undefined) return 'Undefined'
+  if (typeof input === 'number' && Number.isNaN(input)) return 'NaN';
 
-  const raw = Object.prototype.toString.call(value).slice(8, -1)
+  const raw = Object.prototype.toString.call(input).slice(8, -1)
   return raw === 'AsyncFunction' ? 'Promise' : raw
 }
 
-export const isPrimitive = (value: unknown): value is Primitive => primitive.includes(typed(value))
+export const isPrimitive = (input: unknown): input is Primitive => primitive.includes(typed(input))
 
-export const isPrototype = (value: unknown): boolean => {
-  if (typeof value !== 'object' || value === null) return false;
+export const isPrototype = (input: unknown): boolean => {
+  if (typeof input !== 'object' || input === null) return false;
 
-  const constructor = value.constructor;
+  const constructor = input.constructor;
   const prototype = typeof constructor === 'function' ? constructor.prototype : Object.prototype;
 
-  return value === prototype;
+  return input === prototype;
 }
 
-export const isLength = (value: unknown): boolean => Number.isSafeInteger(value) && (value as number) >= 0;
+export const isLength = (input: unknown): boolean => Number.isSafeInteger(input) && (input as number) >= 0;
 
-export const isString = (value: unknown): value is string => typed(value) === 'String'
+export const isString = (input: unknown): input is string => typed(input) === 'String'
 
-export const isNull = (value: unknown): value is null => typed(value) === 'Null'
+export const isNull = (input: unknown): input is null => typed(input) === 'Null'
 
-export const isNil = (value: unknown): value is null | undefined => ['Null', 'Undefined'].includes(typed(value))
+export const isNil = (input: unknown): input is null | undefined => ['Null', 'Undefined'].includes(typed(input))
 
-export const isNumber = (value: unknown): value is number => typed(value) === 'Number'
+export const isNumber = (input: unknown): input is number => typed(input) === 'Number'
 
-export const isSymbol = (value: unknown): value is symbol => typed(value) === 'Symbol'
+export const isSymbol = (input: unknown): input is symbol => typed(input) === 'Symbol'
 
-export const isBoolean = (value: unknown): value is boolean => typed(value) === 'Boolean'
+export const isBoolean = (input: unknown): input is boolean => typed(input) === 'Boolean'
 
-export const isBigInt = (value: unknown): value is bigint => typed(value) === 'BigInt';
+export const isBigInt = (input: unknown): input is bigint => typed(input) === 'BigInt';
 
-export const isDate = (value: unknown): value is Date => typed(value) === 'Date'
+export const isDate = (input: unknown): input is Date => typed(input) === 'Date'
 
-export const isFunction = (value: unknown): value is Function => typed(value) === 'Function';
+export const isFunction = (input: unknown): input is Function => typed(input) === 'Function';
 
 export const isNode = (): boolean => typeof process !== 'undefined' && process?.versions != null && process.versions.node != null;
 
 export const isBrowser = (): boolean => typeof window !== 'undefined' && typeof document !== 'undefined' && window.document === document;
 
-export const isArrayLike = (value: unknown): value is ArrayLike<unknown> => {
-  return !['Null', 'Function'].includes(typed(value)) && isLength((value as ArrayLike<unknown>).length);
+export const isArrayLike = (input: unknown): input is ArrayLike<unknown> => {
+  return !['Null', 'Function'].includes(typed(input)) && isLength((input as ArrayLike<unknown>).length);
 }
 
-export const isTypedArray = (value: unknown): value is TypedArray => ArrayBuffer.isView(value) && !(value instanceof DataView);
+export const isTypedArray = (input: unknown): input is TypedArray => ArrayBuffer.isView(input) && !(input instanceof DataView);
 
-export const isArguments = (value?: unknown): value is IArguments => typed(value) === 'Arguments';
+export const isArguments = (input?: unknown): input is IArguments => typed(input) === 'Arguments';
 
-export const isError = (value: unknown): value is Error => typed(value) === 'Error';
+export const isError = (input: unknown): input is Error => typed(input) === 'Error';
 
-export const isEmpty = (value?: unknown): boolean => {
-  if (value === true || value === false) return true
-  if (value === null || value === undefined) return true
-  if (isNumber(value)) return value === 0
-  if (isDate(value)) return isNaN(value.getTime())
-  if (isFunction(value)) return false
-  if (isSymbol(value)) return false
-  if (isArrayLike(value)) return (value as ArrayLike<unknown>).length === 0;
-  const size = (value as { size?: unknown })?.size;
+export const isEmpty = (input?: unknown): boolean => {
+  if (input === true || input === false) return true
+  if (input === null || input === undefined) return true
+  if (isNumber(input)) return input === 0
+  if (isDate(input)) return isNaN(input.getTime())
+  if (isFunction(input)) return false
+  if (isSymbol(input)) return false
+  if (isArrayLike(input)) return (input as ArrayLike<unknown>).length === 0;
+  const size = (input as { size?: unknown })?.size;
   if (typeof size === 'number') return size === 0;
-  if (typeof value === 'object') return Object.keys(value as object).length === 0;
+  if (typeof input === 'object') return Object.keys(input as object).length === 0;
   return false
 }
