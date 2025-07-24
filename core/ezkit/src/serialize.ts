@@ -50,9 +50,60 @@ export class Serializer {
     return ''
   }
 
-  private objectify(object: Record<string, unknown>) { }
+  private objectify(object: Record<string, unknown>) {
+    const tag = Object.prototype.toString.call(object);
 
-  private buildin(type: string, object: unknown) { }
+    // 不是 [object Object]，当作内建类型处理
+    if (tag !== "[object Object]") {
+      const type = tag.length < 10 ? `unknown:${tag}` : tag.slice(8, -1);
+      return this.buildin(type, object);
+    }
+
+    const ctor = object.constructor;
+    const name = ctor === Object || ctor === undefined ? "" : ctor.name;
+
+    // 如果是全局构造函数实例（如 Map、Set 等）
+    if (name && (globalThis as any)[name] === ctor) {
+      return this.buildin(name, object);
+    }
+
+    // 支持 toJSON 且是自定义对象
+    if (typeof (object as any).toJSON === "function") {
+      const json = (object as any).toJSON();
+      return name + (
+        json !== null && typeof json === "object"
+          ? this.$object()
+          : `(${this.serialize(json)})`
+      );
+    }
+
+    // 常规对象序列化
+    const keys = Object.keys(object).sort((a, b) => a.localeCompare(b));
+    const body = keys
+      .map(key => `${key}:${this.serialize(object[key])}`)
+      .join(",");
+
+    return `${name}{${body}}`;
+  }
+
+  private buildin(type: string, value: unknown): string {
+    const name = `$${type}` as keyof this;
+
+    const handler = this[name];
+    if (typeof handler === "function") {
+      return (handler as (arg: unknown) => string).call(this, value);
+    }
+
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      typeof (value as any).entries === "function"
+    ) {
+      return this.entries(type, (value as any).entries());
+    }
+
+    throw new Error(`Cannot serialize type: ${type}`);
+  }
 
   private entries(type: string, entries: Iterable<[unknown, unknown]>): string {
     const sorted = Array.from(entries).sort((a, b) => this.compare(a[0], b[0]));
