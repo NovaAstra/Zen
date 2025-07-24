@@ -68,7 +68,10 @@ export class Serializer {
       }
     }
 
-    return this.serialize(a, true).localeCompare(this.serialize(b, true));
+    return String.prototype.localeCompare.call(
+      this.serialize(a, true),
+      this.serialize(b, true),
+    );
   }
 }
 
