@@ -1,7 +1,7 @@
 import type { Primitive, Typed, TypedArray } from "@zen-core/typist"
 
 const primitive = new Set<Typed>([
-  'Null', 'Undefined', 'String', 'Number', 'Boolean', 'Symbol', 'BigInt',
+  'Null', 'NaN', 'Undefined', 'String', 'Number', 'Boolean', 'Symbol', 'BigInt',
 ]);
 
 export const typed = (input: unknown): Typed => {
@@ -9,8 +9,13 @@ export const typed = (input: unknown): Typed => {
   if (input === undefined) return 'Undefined'
   if (typeof input === 'number' && Number.isNaN(input)) return 'NaN';
 
-  const raw = Object.prototype.toString.call(input).slice(8, -1)
-  return raw === 'AsyncFunction' ? 'Promise' : raw
+  const raw = Object.prototype.toString.call(input).slice(8, -1); // "[object Type]"
+  switch (raw) {
+    case 'AsyncFunction':
+      return 'Promise';
+    default:
+      return raw as Typed;
+  }
 }
 
 export const isPrimitive = (input: unknown): input is Primitive => primitive.has(typed(input))
@@ -40,6 +45,8 @@ export const isSymbol = (input: unknown): input is symbol => typed(input) === 'S
 export const isBoolean = (input: unknown): input is boolean => typed(input) === 'Boolean'
 
 export const isBigInt = (input: unknown): input is bigint => typed(input) === 'BigInt';
+
+export const isPromise = (input: unknown): input is Promise<unknown> => typed(input) === 'Promise';
 
 export const isDate = (input: unknown): input is Date => typed(input) === 'Date'
 

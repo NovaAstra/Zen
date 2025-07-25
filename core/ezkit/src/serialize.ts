@@ -30,7 +30,9 @@ export class Serializer {
 
     const id = `#${this.context.size}`;
     this.context.set(object, id);
+
     const serialized = this.objectify(object);
+    
     this.context.set(object, serialized);
     return serialized;
   }
@@ -90,7 +92,6 @@ export class Serializer {
 
   private buildin(type: string, value: unknown): string {
     const fn = Reflect.get(this, `$${type}`) as ((arg: unknown) => string) | undefined;
-
     if (typeof fn === "function") return fn.call(this, value);
 
     if (
@@ -117,25 +118,16 @@ export class Serializer {
     const body = sorted
       .map(([key, value]) => `${this.serialize(key, true)}:${this.serialize(value)}`)
       .join(",");
-
     return `${type}{${body}}`;
   }
 
   private compare(a: unknown, b: unknown): number {
     if (typeof a === typeof b) {
-      if (typeof a === "string" && typeof b === "string") {
-        return a.localeCompare(b);
-      }
-
-      if (typeof a === "number" && typeof b === "number") {
-        return a - b;
-      }
+      if (typeof a === "string") return a.localeCompare(b as string);
+      if (typeof a === "number") return (a as number) - (b as number);
     }
 
-    return String.prototype.localeCompare.call(
-      this.serialize(a, true),
-      this.serialize(b, true),
-    );
+    return this.serialize(a, true).localeCompare(this.serialize(b, true));
   }
 }
 
