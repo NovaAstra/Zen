@@ -148,7 +148,7 @@ for (const type of [
 }
 
 for (const type of ["BigInt64Array", "BigUint64Array"] as const) {
-  Serializer.prototype["$" + type] = function (input: TypedArray) {
+  Serializer.prototype[`$${type}`] = function (input: TypedArray) {
     return `${type}[${input.join("n,")}${input.length > 0 ? "n" : ""}]`;
   };
 }
