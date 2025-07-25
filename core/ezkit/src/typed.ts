@@ -1,9 +1,5 @@
 import type { Primitive, Typed, TypedArray } from "@zen-core/typist"
 
-const primitive = new Set<Typed>([
-  'Null', 'NaN', 'Undefined', 'String', 'Number', 'Boolean', 'Symbol', 'BigInt',
-]);
-
 export const typed = (input: unknown): Typed => {
   if (input === null) return 'Null'
   if (input === undefined) return 'Undefined'
@@ -18,11 +14,13 @@ export const typed = (input: unknown): Typed => {
   }
 }
 
-export const isPrimitive = (input: unknown): input is Primitive => primitive.has(typed(input))
+export const isPrimitive = (input: unknown): input is Primitive =>
+  input === undefined
+  || input === null
+  || (typeof input !== 'object' && typeof input !== 'function')
 
 export const isPrototype = (input: unknown): boolean => {
   if (typeof input !== 'object' || input === null) return false;
-
   const constructor = (input as object).constructor;
   return input === (typeof constructor === 'function' ? constructor.prototype : Object.prototype);
 }
