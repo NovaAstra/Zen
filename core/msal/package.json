@@ -6,6 +6,7 @@
   "sideEffects": false,
   "main": "src/index.ts",
   "dependencies": {
+    "@zen-core/ezkit": "workspace:*",
     "@azure/msal-browser": "^4.15.0"
   }
 }

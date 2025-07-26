@@ -1,11 +1,13 @@
 import type { Primitive, Typed, TypedArray } from "@zen-core/typist"
 
+const toString = Object.prototype.toString;
+
 export const typed = (input: unknown): Typed => {
   if (input === null) return 'Null'
   if (input === undefined) return 'Undefined'
   if (typeof input === 'number' && Number.isNaN(input)) return 'NaN';
 
-  const raw = Object.prototype.toString.call(input).slice(8, -1); // "[object Type]"
+  const raw = toString.call(input).slice(8, -1); // "[object Type]"
   switch (raw) {
     case 'AsyncFunction':
       return 'Promise';
@@ -15,15 +17,13 @@ export const typed = (input: unknown): Typed => {
 }
 
 export const isPrimitive = (input: unknown): input is Primitive =>
-  input === undefined
-  || input === null
+  input == null
   || (typeof input !== 'object' && typeof input !== 'function')
 
-export const isPrototype = (input: unknown): boolean => {
-  if (typeof input !== 'object' || input === null) return false;
-  const constructor = (input as object).constructor;
-  return input === (typeof constructor === 'function' ? constructor.prototype : Object.prototype);
-}
+export const isPrototype = (input: unknown): boolean =>
+  typeof input === 'object'
+  && input !== null
+  && Object.getPrototypeOf(input) === input;
 
 export const isLength = (input: unknown): boolean => Number.isSafeInteger(input) && (input as number) >= 0;
 
@@ -41,6 +41,8 @@ export const isNumber = (input: unknown): input is number => typed(input) === 'N
 export const isSymbol = (input: unknown): input is symbol => typed(input) === 'Symbol'
 
 export const isBoolean = (input: unknown): input is boolean => typed(input) === 'Boolean'
+
+export const isArray = (input: unknown): input is boolean => typed(input) === 'Array'
 
 export const isBigInt = (input: unknown): input is bigint => typed(input) === 'BigInt';
 
