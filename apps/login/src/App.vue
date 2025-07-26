@@ -8,7 +8,7 @@
 import { login } from "@zen-core/msal";
 
 const handleLogin = () => {
-  login();
+  login("http://localhost:8081");
 };
 </script>
 

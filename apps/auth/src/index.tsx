@@ -1,14 +1,12 @@
-import { InteractionType, MsalClient } from "@zen-core/msal"
+import { autologin } from "@zen-core/msal"
 
-const client = new MsalClient({
-  interactionType: InteractionType.Popup,
+autologin({
   request: { scopes: ['User.Read'] },
   configuration: {
     auth: {
       clientId: '93e341b0-50d7-4762-a3e6-70c9bcfaefdc',
       authority: 'https://login.microsoftonline.com/common',
-      redirectUri: "http://localhost:8081/blank.html",
-      postLogoutRedirectUri: 'http://localhost:8081/login',
+      redirectUri: "http://localhost:8081",
       navigateToLoginRequestUrl: true
     },
     cache: {
@@ -16,8 +14,4 @@ const client = new MsalClient({
       storeAuthStateInCookie: false
     }
   }
-})
-
-client.bootstrap().then(() => {
-  client.login()
 })
