@@ -6,8 +6,9 @@
   },
   "devDependencies": {
     "gulp": "^3.9.1",
+    "gulp-autoprefixer": "^4.0.0",
     "gulp-cssmin": "^0.1.7",
-    "gulp-dart-sass": "^1.0.2",
-    "gulp-autoprefixer": "^4.0.0"
-  }
+    "gulp-dart-sass": "^1.0.2"
+  },
+  "dependencies": {}
 }
