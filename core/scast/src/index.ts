@@ -10,7 +10,10 @@ export const enum Code {
 
 export class Reader {
   private readonly input: string = '';
-  private readonly length: number = 0
+  
+  private get length(): number {
+    return this.input.length
+  }
 
   private offset: number = 0
   private row: number = 1
@@ -18,7 +21,6 @@ export class Reader {
 
   public constructor(input: string) {
     this.input = input;
-    this.length = input.length
   }
 
   public position(): Readonly<Position> {
