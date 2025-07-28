@@ -4,13 +4,20 @@ export interface Position {
   col: number;
 }
 
+export interface Token {
+  kind: TokenKind;
+  value: string;
+}
+
+export const enum TokenKind { }
+
 export const enum Code {
 
 }
 
 export class Reader {
   private readonly input: string = '';
-  
+
   private get length(): number {
     return this.input.length
   }
@@ -36,7 +43,7 @@ export class Reader {
     return this.input.charAt(pos)
   }
 
-  public next() {
+  public next(): string {
     const code = this.input.charAt(this.offset++)
     if (code === '\n') {
       this.row++
@@ -105,22 +112,5 @@ export class Tokenize {
       value,
       start,
     })
-  }
-
-  public peek(offset: number = 0) {
-    if (!this.tokens.length) {
-
-    }
-
-    return this.tokens[offset]
-  }
-
-  public next() {
-    const token = this.tokens.shift()
-    return token
-  }
-
-  public eof() {
-    return typeof this.peek() === 'undefined'
   }
 }
