@@ -11,17 +11,17 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
-    "vue": "^3.5.18"
+    "vue-demi": "^0.14.10"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "^3.2.7",
-    "@storybook/addon-links": "8.6.14",
     "@storybook/addon-essentials": "8.6.14",
+    "@storybook/addon-links": "8.6.14",
     "@storybook/addon-storysource": "8.6.14",
-    "@storybook/theming": "8.6.14",
     "@storybook/blocks": "8.6.14",
     "@storybook/experimental-addon-test": "8.6.14",
     "@storybook/test": "8.6.14",
+    "@storybook/theming": "8.6.14",
     "@storybook/vue3": "8.6.14",
     "@storybook/vue3-vite": "8.6.14",
     "@vitejs/plugin-vue": "^6.0.0",
@@ -33,6 +33,10 @@
     "storybook": "8.6.14",
     "vite": "^6.3.5",
     "vitest": "^3.2.4",
+    "vue": "^3.5.18",
     "vue-tsc": "^3.0.3"
+  },
+  "peerDependencies": {
+    "vue": "2||3"
   }
 }
