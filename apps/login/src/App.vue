@@ -25,7 +25,7 @@ const code = `@include when(hit) {
   }
 `
 
-parse(code).stylesheet()
+// parse(code).stylesheet()
 </script>
 
 <style lang="css" scoped>
