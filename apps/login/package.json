@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@zen-core/msal": "workspace:*",
+    "@zen-core/scast": "workspace:*",
     "vue": "^3.5.18"
   },
   "devDependencies": {

@@ -48,6 +48,9 @@ importers:
       '@zen-core/msal':
         specifier: workspace:*
         version: link:../../core/msal
+      '@zen-core/scast':
+        specifier: workspace:*
+        version: link:../../core/scast
       vue:
         specifier: ^3.5.18
         version: 3.5.18(typescript@5.8.3)
