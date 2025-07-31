@@ -1,0 +1,12 @@
+{
+  "id": "material",
+  "name": "物料",
+  "inputs": [
+    {
+      "field": "title",
+      "type": "string",
+      "required": true
+    }
+  ],
+  "outputs": []
+}
